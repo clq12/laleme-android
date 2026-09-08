@@ -170,6 +170,10 @@ class LaxiangRepository(
                 occurredAt = obj.getLong("occurredAt"),
                 durationSeconds = obj.getInt("durationSeconds"),
                 bristolType = obj.getInt("bristolType"),
+                stoolColor = obj.optString("color").ifBlank { null },
+                stoolAmount = obj.optString("amount").ifBlank { null },
+                stoolSmell = obj.optString("smell").ifBlank { null },
+                bowelFeelings = obj.optString("feelings").ifBlank { null },
                 notes = obj.optString("notes"),
                 photoPath = null,
                 photoRemoteUrl = obj.optString("photoRemoteUrl").ifBlank { null },
@@ -193,6 +197,10 @@ class LaxiangRepository(
                     .put("occurredAt", record.occurredAt)
                     .put("durationSeconds", record.durationSeconds)
                     .put("bristolType", record.bristolType)
+                    .put("color", record.stoolColor ?: "")
+                    .put("amount", record.stoolAmount ?: "")
+                    .put("smell", record.stoolSmell ?: "")
+                    .put("feelings", record.bowelFeelings ?: "")
                     .put("notes", record.notes)
                     .put("photoRemoteUrl", record.photoRemoteUrl ?: "")
                     .put("photoSyncedAt", record.photoSyncedAt ?: JSONObject.NULL)

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,10 @@ import androidx.compose.ui.unit.dp
 import com.laxiang.app.data.RecordEntity
 import com.laxiang.app.model.bristolTypes
 import com.laxiang.app.model.formatDuration
+import com.laxiang.app.model.StoolOption
+import com.laxiang.app.model.stoolAmounts
+import com.laxiang.app.model.stoolColors
+import com.laxiang.app.model.stoolSmells
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
@@ -83,6 +88,33 @@ fun StatsScreen(records: List<RecordEntity>) {
 
         item {
             TypeDistributionCard(records = records)
+        }
+
+        item {
+            AttributeDistributionCard(
+                title = "颜色分布",
+                options = stoolColors,
+                records = records,
+                selector = { it.stoolColor }
+            )
+        }
+
+        item {
+            AttributeDistributionCard(
+                title = "分量分布",
+                options = stoolAmounts,
+                records = records,
+                selector = { it.stoolAmount }
+            )
+        }
+
+        item {
+            AttributeDistributionCard(
+                title = "气味分布",
+                options = stoolSmells,
+                records = records,
+                selector = { it.stoolSmell }
+            )
         }
 
         item {
@@ -284,6 +316,86 @@ private fun TypeDistributionCard(records: List<RecordEntity>) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AttributeDistributionCard(
+    title: String,
+    options: List<StoolOption>,
+    records: List<RecordEntity>,
+    selector: (RecordEntity) -> String?
+) {
+    val total = records.size.coerceAtLeast(1)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            options.forEach { option ->
+                DistributionRow(
+                    label = option.label,
+                    count = records.count { selector(it) == option.id },
+                    total = total
+                )
+            }
+            DistributionRow(
+                label = "未记录",
+                count = records.count { selector(it).isNullOrBlank() },
+                total = total
+            )
+        }
+    }
+}
+
+@Composable
+private fun DistributionRow(
+    label: String,
+    count: Int,
+    total: Int
+) {
+    val ratio = count.toFloat() / total
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.width(104.dp),
+            maxLines = 1
+        )
+        Spacer(modifier = Modifier.size(10.dp))
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(10.dp)
+                .clip(RoundedCornerShape(5.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(ratio)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(5.dp))
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+        Spacer(modifier = Modifier.size(10.dp))
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

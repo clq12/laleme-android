@@ -51,6 +51,11 @@ import com.laxiang.app.model.bristolTypes
 import com.laxiang.app.model.formatDate
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.formatTime
+import com.laxiang.app.model.StoolOption
+import com.laxiang.app.model.stoolAmounts
+import com.laxiang.app.model.stoolColors
+import com.laxiang.app.model.stoolSmells
+import com.laxiang.app.model.bowelFeelings
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -129,6 +134,36 @@ fun EditorScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
         BristolTypeCard(
+            editorState = editorState,
+            onUpdate = onUpdate
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        StoolAttributeCard(
+            title = "大便颜色",
+            options = stoolColors,
+            selectedId = editorState.stoolColor,
+            onSelect = { stoolColor -> onUpdate(editorState.copy(stoolColor = stoolColor)) }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        StoolAttributeCard(
+            title = "分量",
+            options = stoolAmounts,
+            selectedId = editorState.stoolAmount,
+            onSelect = { stoolAmount -> onUpdate(editorState.copy(stoolAmount = stoolAmount)) }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        StoolAttributeCard(
+            title = "气味",
+            options = stoolSmells,
+            selectedId = editorState.stoolSmell,
+            onSelect = { stoolSmell -> onUpdate(editorState.copy(stoolSmell = stoolSmell)) }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        BowelFeelingsCard(
             editorState = editorState,
             onUpdate = onUpdate
         )
@@ -503,6 +538,150 @@ private fun BristolTypeCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+@Composable
+private fun StoolAttributeCard(
+    title: String,
+    options: List<StoolOption>,
+    selectedId: String?,
+    onSelect: (String?) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                options.forEach { option ->
+                    val selected = option.id == selectedId
+                    Column(
+                        modifier = Modifier
+                            .width(92.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            )
+                            .border(
+                                width = if (selected) 2.dp else 0.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable { onSelect(if (selected) null else option.id) }
+                            .padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+            val selectedOption = options.firstOrNull { it.id == selectedId }
+            if (selectedOption == null) {
+                Text(
+                    text = "未选择，可保持为空。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = selectedOption.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (selectedOption.warning) {
+                    Text(
+                        text = "如持续出现建议就医",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BowelFeelingsCard(
+    editorState: EditorState,
+    onUpdate: (EditorState) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "排便感受",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                bowelFeelings.forEach { option ->
+                    val selected = option.id in editorState.bowelFeelings
+                    Column(
+                        modifier = Modifier
+                            .width(92.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(
+                                if (selected) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                }
+                            )
+                            .border(
+                                width = if (selected) 2.dp else 0.dp,
+                                color = MaterialTheme.colorScheme.primary,
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                            .clickable {
+                                val nextFeelings = if (selected) {
+                                    editorState.bowelFeelings - option.id
+                                } else {
+                                    editorState.bowelFeelings + option.id
+                                }
+                                onUpdate(editorState.copy(bowelFeelings = nextFeelings))
+                            }
+                            .padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
         }
     }
 }

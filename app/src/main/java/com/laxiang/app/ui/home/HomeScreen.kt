@@ -38,6 +38,7 @@ import com.laxiang.app.model.bristolTypeOf
 import com.laxiang.app.model.formatDateTime
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.formatElapsedSeconds
+import com.laxiang.app.model.stoolAttributeSummary
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -333,6 +334,16 @@ private fun RecordCard(
                 )
                 Text(
                     text = "${formatDateTime(record.occurredAt)} · ${formatDuration(record.durationSeconds)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stoolAttributeSummary(
+                        record.stoolColor,
+                        record.stoolAmount,
+                        record.stoolSmell,
+                        record.bowelFeelings
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

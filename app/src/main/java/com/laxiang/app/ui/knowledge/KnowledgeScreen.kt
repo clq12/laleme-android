@@ -23,6 +23,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.model.bristolTypes
+import com.laxiang.app.model.stoolColors
+import com.laxiang.app.model.stoolSmells
 
 @Composable
 fun KnowledgeScreen() {
@@ -83,7 +85,74 @@ fun KnowledgeScreen() {
         }
 
         item {
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "大便颜色可能的原因",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "颜色会受饮食、消化速度和胆汁影响",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        items(stoolColors) { option ->
+            StoolKnowledgeCard(option)
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "大便气味可能的原因",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "气味与食物成分、菌群发酵和消化吸收有关",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        items(stoolSmells) { option ->
+            StoolKnowledgeCard(option)
+        }
+
+        item {
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun StoolKnowledgeCard(option: com.laxiang.app.model.StoolOption) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = option.label,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = option.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (option.warning) {
+                Text(
+                    text = "如持续出现建议就医",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
         }
     }
 }

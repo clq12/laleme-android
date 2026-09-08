@@ -142,7 +142,10 @@ fun LaxiangApp() {
                 EditorScreen(
                     editorState = editorState,
                     onUpdate = viewModel::updateEditor,
-                    onSave = viewModel::saveEditor,
+                    onSave = {
+                        viewModel.saveEditor()
+                        navController.popBackStack()
+                    },
                     onDelete = viewModel::deleteEditor,
                     onCancel = viewModel::clearEditor,
                     onNavigateBack = { navController.popBackStack() },
