@@ -19,17 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.data.RecordEntity
+import com.laxiang.app.ui.common.LaxiangDatePickerDialog
 import com.laxiang.app.model.bristolTypes
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.StoolOption
@@ -54,7 +51,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
@@ -121,53 +117,24 @@ fun StatsScreen(records: List<RecordEntity>) {
     val perDay = total.toDouble() / spanDays
     val spanText = "${dayFormatter.format(rangeStart)} ~ ${dayFormatter.format(rangeEnd)} · 共 $spanDays 天"
 
-    val todayUtcEnd = today.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli() - 1
-    val selectableDates = remember(todayUtcEnd, today) {
-        object : SelectableDates {
-            // 未来的日期没有意义，直接禁掉
-            override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayUtcEnd
-            override fun isSelectableYear(year: Int): Boolean = year <= today.year
-        }
-    }
-
     if (showDatePicker) {
         val initialDate = if (pickingStart) rangeStart else rangeEnd
-        val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = initialDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
-            selectableDates = selectableDates
-        )
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pickerState.selectedDateMillis?.let { millis ->
-                            val picked = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneOffset.UTC)
-                                .toLocalDate()
-                            if (pickingStart) {
-                                customStart = picked
-                                if (customEnd.isBefore(picked)) customEnd = picked
-                            } else {
-                                customEnd = picked
-                                if (customStart.isAfter(picked)) customStart = picked
-                            }
-                            rangeMode = StatsRange.Custom
-                        }
-                        showDatePicker = false
-                    }
-                ) {
-                    Text("确定")
+        LaxiangDatePickerDialog(
+            initialDate = initialDate,
+            maxDate = today, // 未来的日期没有意义，直接禁掉
+            onDismiss = { showDatePicker = false },
+            onConfirm = { picked ->
+                if (pickingStart) {
+                    customStart = picked
+                    if (customEnd.isBefore(picked)) customEnd = picked
+                } else {
+                    customEnd = picked
+                    if (customStart.isAfter(picked)) customStart = picked
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("取消")
-                }
+                rangeMode = StatsRange.Custom
+                showDatePicker = false
             }
-        ) {
-            DatePicker(state = pickerState, showModeToggle = false)
-        }
+        )
     }
 
     LazyColumn(

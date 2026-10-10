@@ -58,12 +58,12 @@ import com.laxiang.app.model.stoolSmells
 import com.laxiang.app.model.bowelFeelings
 import com.laxiang.app.model.bodyStatuses
 import com.laxiang.app.model.toggleStatus
+import com.laxiang.app.ui.common.LaxiangDatePickerDialog
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
-import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -307,105 +307,6 @@ fun EditorScreen(
             }
         )
     }
-}
-
-@Composable
-private fun LaxiangDatePickerDialog(
-    initialDate: LocalDate,
-    onDismiss: () -> Unit,
-    onConfirm: (LocalDate) -> Unit
-) {
-    var displayedMonth by remember { mutableStateOf(YearMonth.from(initialDate)) }
-    var selectedDate by remember { mutableStateOf(initialDate) }
-    val weekLabels = listOf("一", "二", "三", "四", "五", "六", "日")
-    val leadingBlanks = displayedMonth.atDay(1).dayOfWeek.value - 1
-    val daysInMonth = displayedMonth.lengthOfMonth()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = "选择日期") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { displayedMonth = displayedMonth.minusMonths(1) }) {
-                        Text(text = "←")
-                    }
-                    Text(
-                        text = "${displayedMonth.year}年${displayedMonth.monthValue}月",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    TextButton(onClick = { displayedMonth = displayedMonth.plusMonths(1) }) {
-                        Text(text = "→")
-                    }
-                }
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    weekLabels.forEach { label ->
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.weight(1f),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                    }
-                }
-                repeat((daysInMonth + leadingBlanks + 6) / 7) { weekIndex ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        repeat(7) { dayIndex ->
-                            val cellIndex = weekIndex * 7 + dayIndex
-                            val dayNumber = cellIndex - leadingBlanks + 1
-                            val date = if (dayNumber in 1..daysInMonth) {
-                                displayedMonth.atDay(dayNumber)
-                            } else {
-                                null
-                            }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(vertical = 2.dp)
-                                    .height(38.dp)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (date == selectedDate) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant
-                                        }
-                                    )
-                                    .clickable { date?.let { selectedDate = it } },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (date != null) {
-                                    Text(
-                                        text = dayNumber.toString(),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (date == selectedDate) {
-                                            MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(selectedDate) }) {
-                Text(text = "确定")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = "取消")
-            }
-        }
-    )
 }
 
 @Composable
