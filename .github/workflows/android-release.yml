@@ -106,6 +106,32 @@ jobs:
           cp "$(ls app/build/outputs/apk/release/*.apk | head -1)" "dist/laleme-v${VERSION}.apk"
           ls -lh dist
 
+      # 在流程内核对签名指纹：万一签名 Secrets 没生效、回退成 debug 签名，
+      # 这里会直接让构建失败，避免把「装不上去的包」发出去。
+      # 以后换签名证书时，改下面的 EXPECTED_SHA256 即可。
+      - name: 校验 APK 签名
+        id: signcheck
+        env:
+          EXPECTED_SHA256: c864c08707544938b1bf1b5c846012db53b8183fdc72d583f9e078281137a551
+        run: |
+          set -euo pipefail
+          APK=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          APKSIGNER=$(ls "$SDK"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$APKSIGNER" ]; then
+            echo "::error::找不到 apksigner，无法校验签名"
+            exit 1
+          fi
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
+          DIGEST=$(grep -i 'certificate SHA-256 digest' /tmp/certs.txt | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
+          echo "实际签名指纹: $DIGEST"
+          echo "sha256=$DIGEST" >> "$GITHUB_OUTPUT"
+          if [ "$DIGEST" != "$EXPECTED_SHA256" ]; then
+            echo "::error::APK 签名指纹与正式证书不一致（可能回退到 debug 签名），已中止发布"
+            exit 1
+          fi
+          echo "✅ 已用正式签名证书签名，可直接覆盖安装升级。"
+
       - name: 上传构建产物
         uses: actions/upload-artifact@v4
         with:
@@ -157,5 +183,15 @@ jobs:
           tag_name: v${{ steps.version.outputs.name }}
           name: 拉了么 v${{ steps.version.outputs.name }}
           files: dist/*.apk
-          generate_release_notes: true
           fail_on_unmatched_files: true
+          body: |
+            ## 拉了么 v${{ steps.version.outputs.name }}
+
+            | 项目 | 值 |
+            | --- | --- |
+            | 版本号 | ${{ steps.version.outputs.name }}（versionCode ${{ steps.version.outputs.code }}） |
+            | 安装包 | `laleme-v${{ steps.version.outputs.name }}.apk` |
+            | 签名 SHA-256 | `${{ steps.signcheck.outputs.sha256 }}` |
+            | 构建提交 | `${{ github.sha }}` |
+
+            签名与历史正式版一致，已装旧版可直接覆盖安装升级。
