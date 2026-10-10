@@ -95,15 +95,14 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
-      # 注意：不要把带中文的值写进 $GITHUB_ENV（非 ASCII 会被吞掉），
-      # 中文前缀直接写在 workflow 文件里，版本号用纯数字变量拼接。
+      # 磁盘上的文件名用纯 ASCII，避免非 ASCII 在文件系统/上传环节被吞；
+      # 中文名留到发布后用 GitHub API 显式设置（见最后一步）。
       - name: 整理产物
         env:
           VERSION: ${{ steps.version.outputs.name }}
         run: |
           mkdir -p dist
-          src=$(ls app/build/outputs/apk/release/*.apk | head -1)
-          cp "$src" "dist/拉了么-v${VERSION}.apk"
+          cp "$(ls app/build/outputs/apk/release/*.apk | head -1)" "dist/lale-v${VERSION}.apk"
           ls -lh dist
 
       - name: 上传构建产物
@@ -113,6 +112,44 @@ jobs:
           path: dist/*.apk
           if-no-files-found: error
 
+      # 同版本重复推送先清掉旧 Release 与 tag，保证每次只有一份 APK，不会越堆越多。
+      - name: 清理同版本旧 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: v${{ steps.version.outputs.name }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.error, urllib.request
+
+          tok, repo, tag = os.environ["GH_TOKEN"], os.environ["REPO"], os.environ["TAG"]
+          base = "https://api.github.com/repos/" + repo
+
+          def call(method, path, body=None):
+              req = urllib.request.Request(
+                  base + path, method=method,
+                  data=json.dumps(body).encode() if body is not None else None)
+              req.add_header("Authorization", "Bearer " + tok)
+              req.add_header("Accept", "application/vnd.github+json")
+              req.add_header("User-Agent", "gh-actions")
+              if body is not None:
+                  req.add_header("Content-Type", "application/json")
+              try:
+                  with urllib.request.urlopen(req) as resp:
+                      raw = resp.read()
+                      return resp.status, (json.loads(raw) if raw else None)
+              except urllib.error.HTTPError as err:
+                  return err.code, None
+
+          status, rel = call("GET", "/releases/tags/" + tag)
+          if status == 200 and rel:
+              call("DELETE", "/releases/" + str(rel["id"]))
+              print("已删除旧 Release", tag)
+          else:
+              print("没有同版本旧 Release，跳过")
+          print("清理 tag 返回:", call("DELETE", "/git/refs/tags/" + tag)[0])
+          PY
+
       - name: 发布 GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -121,3 +158,43 @@ jobs:
           files: dist/*.apk
           generate_release_notes: true
           fail_on_unmatched_files: true
+
+      # $GITHUB_ENV / 文件名会把非 ASCII 吞掉，但 YAML 字面量里的中文没问题，
+      # 所以这里用 env 传入中文名，再通过 API 给资产改名。
+      - name: 修正 APK 资产名
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: v${{ steps.version.outputs.name }}
+          APK_NAME: 拉了么-v${{ steps.version.outputs.name }}.apk
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+
+          tok, repo, tag = os.environ["GH_TOKEN"], os.environ["REPO"], os.environ["TAG"]
+          target = os.environ["APK_NAME"]
+          base = "https://api.github.com/repos/" + repo
+
+          def call(method, path, body=None):
+              req = urllib.request.Request(
+                  base + path, method=method,
+                  data=json.dumps(body).encode() if body is not None else None)
+              req.add_header("Authorization", "Bearer " + tok)
+              req.add_header("Accept", "application/vnd.github+json")
+              req.add_header("User-Agent", "gh-actions")
+              if body is not None:
+                  req.add_header("Content-Type", "application/json")
+              with urllib.request.urlopen(req) as resp:
+                  raw = resp.read()
+                  return json.loads(raw) if raw else None
+
+          rel = call("GET", "/releases/tags/" + tag)
+          for asset in rel.get("assets", []):
+              if not asset["name"].lower().endswith(".apk"):
+                  continue
+              print("当前资产名:", asset["name"], "-> 目标:", target)
+              if asset["name"] != target:
+                  call("PATCH", "/releases/assets/" + str(asset["id"]), {"name": target})
+                  print("已改名")
+          print("完成")
+          PY
