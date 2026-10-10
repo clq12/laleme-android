@@ -13,6 +13,12 @@ interface RecordDao {
     @Query("SELECT * FROM records ORDER BY updatedAt DESC")
     suspend fun getAllRecords(): List<RecordEntity>
 
+    @Query("SELECT * FROM records WHERE deleted = 0 ORDER BY occurredAt DESC")
+    suspend fun getVisibleRecords(): List<RecordEntity>
+
+    @Query("SELECT COUNT(*) FROM records WHERE deleted = 0")
+    suspend fun countVisibleRecords(): Int
+
     @Query("SELECT * FROM records WHERE id = :id LIMIT 1")
     suspend fun getRecord(id: String): RecordEntity?
 

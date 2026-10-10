@@ -18,13 +18,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,10 +43,48 @@ import com.laxiang.app.model.formatDateTime
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.formatElapsedSeconds
 import com.laxiang.app.model.stoolAttributeSummary
+import com.laxiang.app.model.statusLabels
+import com.laxiang.app.model.statusSummary
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import kotlinx.coroutines.delay
+
+/** 历史列表每页条数 */
+private const val PAGE_SIZE = 30
+
+private enum class RecordFilter(val label: String) {
+    All("全部"),
+    Ideal("理想型"),
+    Abnormal("异常型"),
+    WithPhoto("带照片"),
+    WithNotes("有备注"),
+    WithStatus("有状态")
+}
+
+private fun RecordEntity.matchesFilter(filter: RecordFilter): Boolean = when (filter) {
+    RecordFilter.All -> true
+    RecordFilter.Ideal -> bristolType == 3 || bristolType == 4
+    RecordFilter.Abnormal -> bristolType != 3 && bristolType != 4
+    RecordFilter.WithPhoto -> photoPath != null
+    RecordFilter.WithNotes -> notes.isNotBlank()
+    RecordFilter.WithStatus -> !bodyStatuses.isNullOrBlank()
+}
+
+private fun RecordEntity.matchesQuery(query: String): Boolean {
+    val keyword = query.trim()
+    if (keyword.isEmpty()) return true
+    val haystack = buildString {
+        append(notes)
+        append(' ')
+        append(bristolTypeOf(bristolType).title)
+        append(' ')
+        append(stoolAttributeSummary(stoolColor, stoolAmount, stoolSmell, bowelFeelings))
+        append(' ')
+        append(statusSummary(bodyStatuses))
+    }
+    return haystack.contains(keyword, ignoreCase = true)
+}
 
 @Composable
 fun HomeScreen(
@@ -54,7 +96,7 @@ fun HomeScreen(
     onDeleteRecord: (RecordEntity) -> Unit
 ) {
     val today = LocalDate.now()
-    val todayRecords = remember(records) {
+    val todayRecords = remember(records, today) {
         records.filter {
             LocalDate.ofInstant(Instant.ofEpochMilli(it.occurredAt), ZoneId.systemDefault()) == today
         }
@@ -65,6 +107,19 @@ fun HomeScreen(
         todayRecords.sumOf { it.durationSeconds } / todayRecords.size
     }
     val latestRecord = todayRecords.maxByOrNull { it.occurredAt }
+
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(RecordFilter.All) }
+    var visibleCount by remember { mutableStateOf(PAGE_SIZE) }
+
+    val filtered = remember(records, query, filter) {
+        records.filter { it.matchesFilter(filter) && it.matchesQuery(query) }
+    }
+    // 搜索词或筛选一变，分页从头开始，避免停在「第 5 页却只剩 3 条结果」
+    LaunchedEffect(query, filter) {
+        visibleCount = PAGE_SIZE
+    }
+    val paged = filtered.take(visibleCount)
 
     LazyColumn(
         modifier = Modifier
@@ -120,24 +175,45 @@ fun HomeScreen(
         }
 
         item {
-            Text(
-                text = "最近记录",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+            HistoryFilterCard(
+                query = query,
+                onQueryChange = { query = it },
+                filter = filter,
+                onFilterChange = { filter = it },
+                totalCount = records.size,
+                matchedCount = filtered.size
             )
         }
 
-        if (records.isEmpty()) {
+        if (filtered.isEmpty()) {
             item {
-                EmptyStateCard()
+                EmptyStateCard(hasAnyRecord = records.isNotEmpty())
             }
         } else {
-            items(records.take(20)) { record ->
+            items(paged, key = { it.id }) { record ->
                 RecordCard(
                     record = record,
                     onClick = { onEditRecord(record) },
                     onDelete = { onDeleteRecord(record) }
                 )
+            }
+            if (paged.size < filtered.size) {
+                item {
+                    LoadMoreRow(
+                        shown = paged.size,
+                        total = filtered.size,
+                        onLoadMore = { visibleCount += PAGE_SIZE }
+                    )
+                }
+            } else if (filtered.size > PAGE_SIZE) {
+                item {
+                    Text(
+                        text = "已显示全部 ${filtered.size} 条",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
 
@@ -156,6 +232,8 @@ private fun TimerCard(
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
     LaunchedEffect(timerStart) {
+        // 没在计时就别每秒刷一次首页，白耗电
+        if (timerStart == null) return@LaunchedEffect
         while (true) {
             now = System.currentTimeMillis()
             delay(1000)
@@ -274,7 +352,113 @@ private fun SummaryMetric(
 }
 
 @Composable
-private fun EmptyStateCard() {
+private fun HistoryFilterCard(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    filter: RecordFilter,
+    onFilterChange: (RecordFilter) -> Unit,
+    totalCount: Int,
+    matchedCount: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "历史记录",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = if (matchedCount == totalCount) {
+                        "共 $totalCount 条"
+                    } else {
+                        "命中 $matchedCount / $totalCount"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("搜备注、类型、颜色分量或状态") },
+                singleLine = true,
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        TextButton(onClick = { onQueryChange("") }) {
+                            Text("清空")
+                        }
+                    }
+                }
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RecordFilter.entries.take(3).forEach { item ->
+                    FilterChip(
+                        selected = filter == item,
+                        onClick = { onFilterChange(item) },
+                        label = { Text(item.label) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RecordFilter.entries.drop(3).forEach { item ->
+                    FilterChip(
+                        selected = filter == item,
+                        onClick = { onFilterChange(item) },
+                        label = { Text(item.label) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadMoreRow(
+    shown: Int,
+    total: Int,
+    onLoadMore: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        OutlinedButton(
+            onClick = onLoadMore,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("加载更多")
+        }
+        Text(
+            text = "已显示 $shown / $total 条",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun EmptyStateCard(hasAnyRecord: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -285,15 +469,22 @@ private fun EmptyStateCard() {
                 .padding(vertical = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(text = "🍃", style = MaterialTheme.typography.displayMedium)
+            Text(
+                text = if (hasAnyRecord) "🔍" else "🍃",
+                style = MaterialTheme.typography.displayMedium
+            )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "当前空空如也",
+                text = if (hasAnyRecord) "没有匹配的记录" else "当前空空如也",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "点击上面的按钮开始第一条记录",
+                text = if (hasAnyRecord) {
+                    "换个关键词或筛选项试试"
+                } else {
+                    "点击上面的按钮开始第一条记录"
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -347,6 +538,16 @@ private fun RecordCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                val statuses = statusLabels(record.bodyStatuses)
+                if (statuses.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "当前状态：" + statuses.joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.tertiary
+                    )
+                }
                 if (record.notes.isNotBlank() || record.photoPath != null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(

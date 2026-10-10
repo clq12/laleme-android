@@ -56,6 +56,8 @@ import com.laxiang.app.model.stoolAmounts
 import com.laxiang.app.model.stoolColors
 import com.laxiang.app.model.stoolSmells
 import com.laxiang.app.model.bowelFeelings
+import com.laxiang.app.model.bodyStatuses
+import com.laxiang.app.model.toggleStatus
 import java.io.File
 import java.time.Instant
 import java.time.LocalDate
@@ -107,7 +109,13 @@ fun EditorScreen(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = onNavigateBack) {
+            TextButton(
+                onClick = {
+                    // 顺手清掉编辑态，避免下次进来看到上次的残留草稿
+                    onCancel()
+                    onNavigateBack()
+                }
+            ) {
                 Text(text = "返回")
             }
             Text(
@@ -163,9 +171,33 @@ fun EditorScreen(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
-        BowelFeelingsCard(
-            editorState = editorState,
-            onUpdate = onUpdate
+        MultiSelectCard(
+            title = "排便感受",
+            options = bowelFeelings,
+            selectedIds = editorState.bowelFeelings,
+            onToggle = { id ->
+                val next = if (id in editorState.bowelFeelings) {
+                    editorState.bowelFeelings - id
+                } else {
+                    editorState.bowelFeelings + id
+                }
+                onUpdate(editorState.copy(bowelFeelings = next))
+            }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+        MultiSelectCard(
+            title = "当前状态（选填）",
+            hint = "记录当时的状态或可能的原因，可多选；不选也能直接保存，表示这次没找到明确原因。",
+            emptyHint = "未选择 —— 选填项，留空直接保存即可。",
+            options = bodyStatuses,
+            selectedIds = editorState.bodyStatuses,
+            onClear = { onUpdate(editorState.copy(bodyStatuses = emptySet())) },
+            onToggle = { id ->
+                onUpdate(
+                    editorState.copy(bodyStatuses = toggleStatus(editorState.bodyStatuses, id))
+                )
+            }
         )
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -527,7 +559,8 @@ private fun BristolTypeCard(
                     }
                 }
             }
-            val selectedType = bristolTypes.first { it.type == editorState.bristolType }
+            val selectedType = bristolTypes.firstOrNull { it.type == editorState.bristolType }
+                ?: bristolTypes[3]
             Text(
                 text = "${selectedType.title} · ${selectedType.subtitle}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -623,9 +656,14 @@ private fun StoolAttributeCard(
 }
 
 @Composable
-private fun BowelFeelingsCard(
-    editorState: EditorState,
-    onUpdate: (EditorState) -> Unit
+private fun MultiSelectCard(
+    title: String,
+    options: List<StoolOption>,
+    selectedIds: Set<String>,
+    hint: String? = null,
+    emptyHint: String = "未选择，可保持为空。",
+    onClear: (() -> Unit)? = null,
+    onToggle: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -635,17 +673,35 @@ private fun BowelFeelingsCard(
             modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "排便感受",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                if (onClear != null && selectedIds.isNotEmpty()) {
+                    TextButton(onClick = onClear) {
+                        Text(text = "清空")
+                    }
+                }
+            }
+            if (hint != null) {
+                Text(
+                    text = hint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Row(
                 modifier = Modifier.horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                bowelFeelings.forEach { option ->
-                    val selected = option.id in editorState.bowelFeelings
+                options.forEach { option ->
+                    val selected = option.id in selectedIds
                     Column(
                         modifier = Modifier
                             .width(92.dp)
@@ -662,14 +718,7 @@ private fun BowelFeelingsCard(
                                 color = MaterialTheme.colorScheme.primary,
                                 shape = RoundedCornerShape(16.dp)
                             )
-                            .clickable {
-                                val nextFeelings = if (selected) {
-                                    editorState.bowelFeelings - option.id
-                                } else {
-                                    editorState.bowelFeelings + option.id
-                                }
-                                onUpdate(editorState.copy(bowelFeelings = nextFeelings))
-                            }
+                            .clickable { onToggle(option.id) }
                             .padding(vertical = 12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -680,6 +729,29 @@ private fun BowelFeelingsCard(
                             maxLines = 1
                         )
                     }
+                }
+            }
+            val selectedOptions = options.filter { it.id in selectedIds }
+            if (selectedOptions.isEmpty()) {
+                Text(
+                    text = emptyHint,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                selectedOptions.forEach { option ->
+                    Text(
+                        text = "${option.label}：${option.description}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (selectedOptions.any { it.warning }) {
+                    Text(
+                        text = "如持续出现建议就医",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }

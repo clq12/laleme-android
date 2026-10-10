@@ -18,4 +18,9 @@ val bristolTypes = listOf(
     BristolType(7, "7型 水样无固体", "💧", "严重腹泻", "完全水样，可能存在感染或食物中毒，注意补水并考虑就医。")
 )
 
-fun bristolTypeOf(type: Int): BristolType = bristolTypes.first { it.type == type }
+/**
+ * 兜底返回 4 型：远端同步回来的数据可能是旧的或被改坏过，
+ * 用 first{} 硬查会直接抛 NoSuchElementException 把首页渲染搞崩。
+ */
+fun bristolTypeOf(type: Int): BristolType =
+    bristolTypes.firstOrNull { it.type == type } ?: bristolTypes[3]

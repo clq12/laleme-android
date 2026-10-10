@@ -8,8 +8,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +53,7 @@ fun LaxiangApp() {
     val application = context.applicationContext as LaxiangApplication
     val viewModel: LaxiangViewModel = viewModel(
         factory = viewModelFactory {
-            initializer { LaxiangViewModel(application.repository) }
+            initializer { LaxiangViewModel(application.applicationContext, application.repository) }
         }
     )
     val navController = rememberNavController()
@@ -61,13 +63,33 @@ fun LaxiangApp() {
     val timerStart by viewModel.timerStart.collectAsStateWithLifecycle()
     val editorState by viewModel.editorState.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
+    val syncProgress by viewModel.syncProgress.collectAsStateWithLifecycle()
+    val syncRunning by viewModel.syncRunning.collectAsStateWithLifecycle()
+    val deletedRecord by viewModel.deletedRecord.collectAsStateWithLifecycle()
+    val photoUsage by viewModel.photoUsage.collectAsStateWithLifecycle()
+    val backupInfo by viewModel.backupInfo.collectAsStateWithLifecycle()
+    val localRecordCount by viewModel.localRecordCount.collectAsStateWithLifecycle()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
     LaunchedEffect(syncMessage) {
-        if (syncMessage != null) {
-            snackbarHostState.showSnackbar(syncMessage!!)
-            viewModel.dismissSyncMessage()
+        val message = syncMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.dismissSyncMessage()
+    }
+
+    // 删除不再是「点了就没」——给一次撤销机会
+    LaunchedEffect(deletedRecord) {
+        val record = deletedRecord ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = "已删除 1 条记录",
+            actionLabel = "撤销",
+            duration = SnackbarDuration.Long
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            viewModel.undoDelete()
+        } else {
+            viewModel.consumeDeletedRecord()
         }
     }
 
@@ -132,10 +154,19 @@ fun LaxiangApp() {
             composable("settings") {
                 SettingsScreen(
                     settings = settings,
+                    syncProgress = syncProgress,
+                    syncRunning = syncRunning,
+                    photoUsage = photoUsage,
+                    backupInfo = backupInfo,
+                    localRecordCount = localRecordCount,
                     onSaveSettings = viewModel::saveSettings,
+                    onMergeSync = viewModel::mergeSync,
                     onOverwriteUpload = viewModel::overwriteUpload,
                     onOverwriteDownload = viewModel::overwriteDownload,
-                    onTestConnection = viewModel::testConnection
+                    onTestConnection = viewModel::testConnection,
+                    onCleanOrphanPhotos = viewModel::cleanOrphanPhotos,
+                    onRefreshMaintenance = viewModel::refreshMaintenanceInfo,
+                    onExportData = viewModel::exportData
                 )
             }
             composable("editor") {

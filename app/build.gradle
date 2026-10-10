@@ -83,6 +83,7 @@ dependencies {
 
     implementation "com.squareup.okhttp3:okhttp:$rootProject.ext.okhttpVersion"
     implementation "io.coil-kt:coil-compose:$rootProject.ext.coilVersion"
+    implementation "androidx.exifinterface:exifinterface:$rootProject.ext.exifVersion"
 
     implementation "androidx.camera:camera-camera2:$rootProject.ext.cameraVersion"
     implementation "androidx.camera:camera-lifecycle:$rootProject.ext.cameraVersion"

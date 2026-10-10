@@ -77,6 +77,43 @@ val bowelFeelings = listOf(
     StoolOption("incomplete", "排便不净", "可能提示直肠刺激、炎症或粪便滞留。")
 )
 
+/**
+ * 记录当时的「当前状态 / 诱因」，可多选。
+ * 目的是事后能回溯：到底是哪些原因让人闹肚子。
+ */
+val bodyStatuses = listOf(
+    StoolOption("cold", "着凉", "腹部受凉后肠道蠕动容易加快，可能腹痛或稀便。"),
+    StoolOption("heavy_flavor", "吃了重口", "高油、高辣、重咸的饮食容易刺激肠道。"),
+    StoolOption("bad_food", "吃坏肚子", "怀疑食物不洁，常伴随腹痛、腹泻或恶心。"),
+    StoolOption("stale_food", "吃了不新鲜", "食物放置过久或已变质，吃完容易肠胃不适。"),
+    StoolOption("alcohol", "饮酒", "酒精刺激肠道，可能让大便变稀、次数变多。"),
+    StoolOption("late_night", "熬夜", "作息紊乱会影响肠道节律与消化功能。"),
+    StoolOption("stress", "压力大", "紧张焦虑容易引起肠道功能紊乱。"),
+    StoolOption("dairy", "吃了乳制品", "乳糖不耐受常见腹胀、肠鸣和稀便。"),
+    StoolOption("none", "无明显诱因", "没找到明显原因，正常记录即可。")
+)
+
+/** 「无明显诱因」与其他状态互斥，避免选出「着凉 + 无明显诱因」这种自相矛盾的组合。 */
+const val NO_OBVIOUS_CAUSE_ID = "none"
+
+fun toggleStatus(selected: Set<String>, id: String): Set<String> = when {
+    id == NO_OBVIOUS_CAUSE_ID -> if (id in selected) selected - id else setOf(id)
+    id in selected -> selected - id
+    else -> selected - NO_OBVIOUS_CAUSE_ID + id
+}
+
+fun statusLabels(statuses: String?): List<String> =
+    statuses
+        ?.split(',')
+        ?.filter { it.isNotBlank() }
+        ?.mapNotNull { statusId -> bodyStatuses.firstOrNull { it.id == statusId }?.label }
+        ?: emptyList()
+
+fun statusSummary(statuses: String?): String {
+    val labels = statusLabels(statuses)
+    return if (labels.isEmpty()) "未记录" else labels.joinToString(" · ")
+}
+
 fun stoolOptionOf(options: List<StoolOption>, id: String?): StoolOption? =
     options.firstOrNull { it.id == id }
 

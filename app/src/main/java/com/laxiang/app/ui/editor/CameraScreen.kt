@@ -35,6 +35,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,8 +46,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.laxiang.app.data.ImageCompressor
 import java.io.File
 import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun CameraScreen(
@@ -68,6 +73,7 @@ fun CameraScreen(
     }
     val previewView = remember { PreviewView(context) }
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val scope = rememberCoroutineScope()
     var isCapturing by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -171,8 +177,14 @@ fun CameraScreen(
                         ContextCompat.getMainExecutor(context),
                         object : ImageCapture.OnImageSavedCallback {
                             override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                                isCapturing = false
-                                onPhotoCaptured(photoFile.absolutePath)
+                                scope.launch {
+                                    // 原图通常 3-6MB，压到长边 1600 再入库：本地省空间，同步也快得多
+                                    withContext(Dispatchers.IO) {
+                                        ImageCompressor.compressInPlace(photoFile)
+                                    }
+                                    isCapturing = false
+                                    onPhotoCaptured(photoFile.absolutePath)
+                                }
                             }
 
                             override fun onError(exception: ImageCaptureException) {

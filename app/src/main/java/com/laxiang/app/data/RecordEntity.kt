@@ -13,6 +13,8 @@ data class RecordEntity(
     val stoolAmount: String?,
     val stoolSmell: String?,
     val bowelFeelings: String?,
+    /** 当时的当前状态/诱因，多选，逗号分隔的 id，例如 "cold,heavy_flavor"。 */
+    val bodyStatuses: String?,
     val notes: String,
     val photoPath: String?,
     val photoRemoteUrl: String?,

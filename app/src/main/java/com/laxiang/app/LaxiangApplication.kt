@@ -16,6 +16,13 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/** v3：新增「当前状态/诱因」多选字段，老记录为 NULL（显示为未记录）。 */
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE records ADD COLUMN bodyStatuses TEXT")
+    }
+}
+
 class LaxiangApplication : Application() {
     lateinit var repository: LaxiangRepository
         private set
@@ -27,7 +34,7 @@ class LaxiangApplication : Application() {
             LaxiangDatabase::class.java,
             "laxiang.db"
         )
-            .addMigrations(MIGRATION_1_2)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
         repository = LaxiangRepository(this, database, database.recordDao(), database.settingsDao())
     }

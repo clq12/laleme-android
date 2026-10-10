@@ -10,12 +10,18 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 class WebDavClient(
     private val username: String,
     private val password: String
 ) {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .writeTimeout(180, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
 
     fun normalizeBaseUrl(url: String): String {
         val value = url.trim().trimEnd('/')
@@ -85,8 +91,31 @@ class WebDavClient(
                 throw IOException("照片下载失败：HTTP ${it.code}")
             }
             target.parentFile?.mkdirs()
-            target.outputStream().use { output ->
-                it.body?.byteStream()?.copyTo(output) ?: throw IOException("远程照片为空")
+            val body = it.body ?: throw IOException("远程照片为空")
+            target.outputStream().use { output -> body.byteStream().copyTo(output) }
+        }
+    }
+
+    /** 列出目录下的文件名（PROPFIND Depth:1，只取路径最后一段）。服务器不支持时返回空列表。 */
+    fun listFileNames(directoryUrl: String): List<String> {
+        val response = execute("PROPFIND", directoryUrl, headers = mapOf("Depth" to "1"))
+        response.use {
+            if (!it.isSuccessful) return emptyList()
+            val body = it.body?.string().orEmpty()
+            return HREF_PATTERN.findAll(body)
+                .map { match -> match.groupValues[1] }
+                .map { href -> Uri.decode(href.trim().trimEnd('/').substringAfterLast('/')) }
+                .filter { name -> name.isNotBlank() }
+                .toList()
+        }
+    }
+
+    /** 删除远端文件，404 视为已删除。 */
+    fun deleteFile(url: String) {
+        val response = execute("DELETE", url)
+        response.use {
+            if (it.code != 404 && !it.isSuccessful) {
+                throw IOException("删除远程文件失败：HTTP ${it.code}")
             }
         }
     }
@@ -94,7 +123,8 @@ class WebDavClient(
     fun testConnection(baseUrl: String, remotePath: String): Boolean {
         val response = execute("PROPFIND", joinUrl(baseUrl, remotePath), headers = mapOf("Depth" to "0"))
         response.use {
-            return it.code == 200 || it.code == 207 || it.code == 404
+            // 连得通、服务器有响应即可；401/403 属于认证问题，判失败
+            return it.code in 200..299 || it.code == 404 || it.code == 405 || it.code == 301
         }
     }
 
@@ -115,4 +145,8 @@ class WebDavClient(
             }
             .build()
     ).execute()
+
+    private companion object {
+        val HREF_PATTERN = Regex("<[^>]*href[^>]*>([^<]+)</[^>]*href>", RegexOption.IGNORE_CASE)
+    }
 }

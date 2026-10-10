@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.model.bristolTypes
+import com.laxiang.app.model.bodyStatuses
 import com.laxiang.app.model.stoolColors
 import com.laxiang.app.model.stoolSmells
 
@@ -117,6 +118,24 @@ fun KnowledgeScreen() {
         }
 
         items(stoolSmells) { option ->
+            StoolKnowledgeCard(option)
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
+            Text(
+                text = "这些状态为什么会影响排便",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "记录时勾选的「当前状态」都在这里，方便回顾哪些原因最容易让你闹肚子",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        items(bodyStatuses) { option ->
             StoolKnowledgeCard(option)
         }
 
