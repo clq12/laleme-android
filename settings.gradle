@@ -1,8 +1,12 @@
+// 依赖仓库：本机默认走国内镜像（快）；GitHub Actions 会自动设置 CI=true，
+// 这时跳过镜像、直接用官方源，避免国外网络访问国内镜像慢或超时。
 pluginManagement {
     repositories {
-        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-        maven { url 'https://mirrors.aliyun.com/repository/google' }
-        maven { url 'https://mirrors.aliyun.com/repository/public' }
+        if (System.getenv('CI') != 'true') {
+            maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
+            maven { url 'https://mirrors.aliyun.com/repository/google' }
+            maven { url 'https://mirrors.aliyun.com/repository/public' }
+        }
         google()
         mavenCentral()
     }
@@ -11,9 +15,11 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
-        maven { url 'https://mirrors.aliyun.com/repository/google' }
-        maven { url 'https://mirrors.aliyun.com/repository/public' }
+        if (System.getenv('CI') != 'true') {
+            maven { url 'https://mirrors.cloud.tencent.com/nexus/repository/maven-public/' }
+            maven { url 'https://mirrors.aliyun.com/repository/google' }
+            maven { url 'https://mirrors.aliyun.com/repository/public' }
+        }
         google()
         mavenCentral()
     }

@@ -1,0 +1,97 @@
+name: 构建并发布 APK
+
+# 有新提交推到主分支就自动构建；也可以在 Actions 页面手动触发一次。
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    name: 构建 Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 配置 Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 SDK 组件
+        run: sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: 配置 Gradle 缓存
+        uses: gradle/actions/setup-gradle@v4
+
+      # 仓库里的 wrapper 指向腾讯云镜像（方便本机在国内下载）；
+      # GitHub 的机器在国外，换成官方分发源更稳。
+      - name: CI 切换到官方 Gradle 分发源
+        run: sed -i 's#mirrors\.cloud\.tencent\.com/gradle/#services.gradle.org/distributions/#g' gradle/wrapper/gradle-wrapper.properties
+
+      - name: 读取版本号
+        id: version
+        run: |
+          name=$(grep -oP "versionName\s+'\K[^']+" app/build.gradle | head -1)
+          code=$(grep -oP "versionCode\s+\K[0-9]+" app/build.gradle | head -1)
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "APK_NAME=拉了么-v${name}.apk" >> "$GITHUB_ENV"
+          echo "版本号：${name}（versionCode ${code}）"
+
+      # 用仓库 Secrets 里的正式签名证书给 APK 签名，
+      # 这样每次出的包签名一致，可以直接覆盖安装升级。
+      - name: 写入签名配置
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > laxiang-release.keystore
+            printf 'storeFile=laxiang-release.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > signing.properties
+            echo "已启用正式签名。"
+          else
+            echo "::warning::未配置签名 Secrets，将回退到 debug 签名（可与正式包共存，但不能互相覆盖升级）。"
+          fi
+
+      - name: 构建 APK
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+
+      - name: 整理产物
+        run: |
+          mkdir -p dist
+          src=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          cp "$src" "dist/$APK_NAME"
+          ls -lh dist
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 拉了么-v${{ steps.version.outputs.name }}
+          path: dist/*.apk
+          if-no-files-found: error
+
+      - name: 发布 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: 拉了么 v${{ steps.version.outputs.name }}
+          files: dist/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: true

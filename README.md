@@ -56,6 +56,27 @@ lale-release.apk
 
 签名文件不会提交到 Git。请在本地保留 `laxiang-release.keystore` 和 `signing.properties`，丢失后无法给同一应用发布可升级的正式版本。
 
+## 自动构建与发布（GitHub Actions）
+
+推送到 `main` 分支后会自动构建 release APK 并发布到 GitHub Releases；也可以在仓库的 Actions 页面手动触发一次。
+
+- Release 标题：`拉了么 v<versionName>`，版本号取自 `app/build.gradle` 的 `versionName`
+- Release 标签：`v<versionName>`
+- APK 文件名：`拉了么-v<versionName>.apk`
+- 同一版本号重复推送会**覆盖**同一个 Release 里的 APK；改完 `versionName` 再推，才会生成新的 Release
+- 构建产物同时能在 Actions 页面该次运行的 Artifacts 里下载
+
+CI 使用仓库 Secrets 里的正式证书签名，四个 Secret：
+
+| Secret | 说明 |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `laxiang-release.keystore` 的 base64（`base64 -w 0 laxiang-release.keystore`） |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore 口令 |
+| `ANDROID_KEY_ALIAS` | 别名（`laxiang`） |
+| `ANDROID_KEY_PASSWORD` | 别名口令 |
+
+没配 Secrets 时 workflow 会退回 debug 签名，仍能出包，但签名与正式包不同，无法覆盖升级。
+
 ## 环境要求（不用 Android Studio 也能构建）
 
 - JDK 17（本机路径：`C:\Android\jdk-17`）

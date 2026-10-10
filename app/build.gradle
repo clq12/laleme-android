@@ -40,6 +40,10 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             if (signingPropertiesFile.exists()) {
                 signingConfig signingConfigs.release
+            } else {
+                // 没有本地 signing.properties（例如 CI 没配签名 Secrets）时回退到 debug 签名，
+                // 保证 assembleRelease 始终产出可直接安装的 APK。正式发版仍应配好签名。
+                signingConfig signingConfigs.debug
             }
         }
     }
