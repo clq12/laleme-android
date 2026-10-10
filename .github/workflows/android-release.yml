@@ -70,7 +70,6 @@ jobs:
           code=$(grep -oP "versionCode\s+\K[0-9]+" app/build.gradle | head -1)
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "APK_NAME=拉了么-v${name}.apk" >> "$GITHUB_ENV"
           echo "版本号：${name}（versionCode ${code}）"
 
       # 用仓库 Secrets 里的正式签名证书给 APK 签名，
@@ -96,11 +95,15 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
+      # 注意：不要把带中文的值写进 $GITHUB_ENV（非 ASCII 会被吞掉），
+      # 中文前缀直接写在 workflow 文件里，版本号用纯数字变量拼接。
       - name: 整理产物
+        env:
+          VERSION: ${{ steps.version.outputs.name }}
         run: |
           mkdir -p dist
           src=$(ls app/build/outputs/apk/release/*.apk | head -1)
-          cp "$src" "dist/$APK_NAME"
+          cp "$src" "dist/拉了么-v${VERSION}.apk"
           ls -lh dist
 
       - name: 上传构建产物
