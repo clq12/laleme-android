@@ -8,7 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -29,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -102,18 +106,75 @@ private fun navIconTint(selected: Boolean) =
  */
 private object NavBarTokens {
     /**
-     * NavigationBar 的内容高度（不含系统导航条 inset）。
+     * NavigationBar 的**内容**高度（不含系统导航条 inset）。
      *
-     * M3 默认 80dp 是按「图标 24 + 指示器 32 + 标签 + 上下留白」定的，
-     * 但那是按大屏/多语言场景取的保守值。本 App 四个入口都是两字中文，
-     * 标签只有一行 12sp，80dp 下内容居中后上下各多出一截空白 ——
-     * 这正是用户反馈「图标下方还有很多空间」的来源。
-     * 压到 60dp 后，24dp 图标 + 32dp 指示器 + 17dp 标签仍能正常排布。
+     * M3 默认的 `NavigationBarHeight = 80dp` 是按大屏/多语言场景取的保守值。
+     * 本 App 四个入口都是两字中文、标签只有一行，80dp 下内容居中后上下各多
+     * 一截空白，就是用户反馈的「图标下方还有很多空间」。
+     * 收到 60dp 后 `24dp 图标 + 32dp 指示器 + 17dp 标签` 仍排布正常。
      *
-     * 注意：不要再靠「给图标加 padding」去压空间 —— 那会让图标脱离
-     * activeIndicator 的居中关系，选中态胶囊就会和图标错位。
+     * ⚠️ 这个值**不能**直接写成 `Modifier.height(...)` —— 见下方 LxBottomBar 的注释。
      */
-    val containerHeight = 60.dp
+    val contentHeight = 60.dp
+
+    /**
+     * 该给 `NavigationBar` 的 windowInsets：只保留**导航条**（手势条/虚拟键）那一段。
+     *
+     * `NavigationBarDefaults.windowInsets` 实际是 `WindowInsets.systemBarsForVisualComponents
+     * .only(Horizontal + Bottom)`——它同时含左右两侧。而本 App 是竖屏为主，
+     * 左右 inset 在竖屏下本来就是 0；显式只取 Bottom 能让语义更准确，
+     * 也避免横屏时左右留白把四个入口挤窄。
+     */
+    val windowInsets: WindowInsets
+        @Composable
+        get() = WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)
+}
+
+/**
+ * 底部导航栏：把「内容高度」与「系统导航条避让」分开处理。
+ *
+ * ⚠️ 为什么不能直接写 `NavigationBar(modifier = Modifier.height(60.dp))`
+ * —— 这正是 v2.5.3 导致「导航栏只显示一半」的 bug，别再退回：
+ *
+ * 反编译 material3 1.3.0 得到 `NavigationBar` 内部的修饰符链（由外到内）：
+ *
+ *     userModifier                       // 你的 Modifier.height(60.dp)
+ *       .fillMaxWidth()
+ *       .windowInsetsPadding(windowInsets)   // ← 导航条 inset 加在 60dp **内部**
+ *       .defaultMinSize(minHeight = 80.dp)
+ *       .selectableGroup()
+ *
+ * 关键在 `windowInsetsPadding` 的位置：它把导航条高度（三键导航是 48dp、
+ * 手势条约 24~34dp）作为**内边距**加进 60dp 里。于是实际留给内容的高度变成
+ *
+ *     60dp − navigationBarInset
+ *
+ * 三键导航机型（inset ≈ 48dp）就只剩 12dp —— 内容被裁掉大半，
+ * 表现就是「导航栏只显示一半」。`defaultMinSize(80dp)` 也救不了：
+ * 它在内层，外层高度是硬约束，改不了结果。
+ *
+ * 正确做法：外层按「内容高度 + inset」算总高度，inset 仍由 NavigationBar
+ * 自己消费（不动它的 windowInsets，避免和 Scaffold 双重叠加）。
+ */
+@Composable
+private fun LxBottomBar(content: @Composable RowScope.() -> Unit) {
+    val systemBars = WindowInsets.navigationBars
+    val bottomInset = with(LocalDensity.current) {
+        systemBars.getBottom(this).toDp()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(NavBarTokens.contentHeight + bottomInset)
+    ) {
+        NavigationBar(
+            modifier = Modifier.fillMaxSize(),
+            // 只让出底部导航条，不取左右（竖屏下左右本就为 0）
+            windowInsets = NavBarTokens.windowInsets,
+            tonalElevation = 0.dp,
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -217,12 +278,7 @@ fun LaxiangApp() {
             .only(WindowInsetsSides.Top),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
-            NavigationBar(
-                modifier = Modifier.height(NavBarTokens.containerHeight),
-                // M3 在这里会自己叠加 navigationBars inset —— 不改它，
-                // 底部手势条/虚拟键的避让由 NavigationBar 负责，与 Scaffold 无重复。
-                tonalElevation = 0.dp
-            ) {
+            LxBottomBar {
                 LxNavItem(
                     selected = currentRoute == "home",
                     onClick = { navController.navigate("home") { launchSingleTop = true } },
