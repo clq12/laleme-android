@@ -35,11 +35,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.data.RecordEntity
+import com.laxiang.app.data.SectionPrefs
+import com.laxiang.app.ui.common.CollapsibleSection
 import com.laxiang.app.ui.common.LaxiangDatePickerDialog
+import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSpacing
 import com.laxiang.app.model.bristolTypes
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.StoolOption
@@ -74,6 +79,19 @@ fun StatsScreen(records: List<RecordEntity>) {
     var customEnd by remember { mutableStateOf(today) }
     var showDatePicker by remember { mutableStateOf(false) }
     var pickingStart by remember { mutableStateOf(true) }
+
+    // 折叠状态：首次进入展开「概览与趋势」，收起其余两组，保持首屏清爽
+    val context = LocalContext.current
+    val sectionPrefs = remember { SectionPrefs(context) }
+    var overviewExpanded by remember {
+        mutableStateOf(sectionPrefs.isExpanded(SectionPrefs.STATS_OVERVIEW, true))
+    }
+    var distributionExpanded by remember {
+        mutableStateOf(sectionPrefs.isExpanded(SectionPrefs.STATS_DISTRIBUTION, false))
+    }
+    var calendarExpanded by remember {
+        mutableStateOf(sectionPrefs.isExpanded(SectionPrefs.STATS_CALENDAR, false))
+    }
 
     val recordDates = remember(records, zone) {
         records.map { LocalDate.ofInstant(Instant.ofEpochMilli(it.occurredAt), zone) }
@@ -141,16 +159,17 @@ fun StatsScreen(records: List<RecordEntity>) {
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = LxSpacing.screenHorizontal),
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
         item {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(LxSpacing.xl))
             Text(
                 text = "数据大盘",
                 style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                color = MaterialTheme.colorScheme.onBackground
             )
+            Spacer(modifier = Modifier.height(LxSpacing.xs))
             Text(
                 text = "下面的统计只算选定范围内的记录，默认最近 14 天",
                 style = MaterialTheme.typography.bodyMedium,
@@ -176,71 +195,99 @@ fun StatsScreen(records: List<RecordEntity>) {
             )
         }
 
+        // ── 分组一：概览与趋势 ──
         item {
-            OverviewCard(
-                rangeLabel = rangeMode.label,
-                spanText = spanText,
-                total = total,
-                perDay = perDay,
-                averageDuration = averageDuration,
-                healthRate = healthRate
-            )
-        }
-
-        item {
-            TrendCard(grouped = grouped, endDate = rangeEnd)
-        }
-
-        item {
-            TypeDistributionCard(records = rangeRecords, rangeLabel = rangeMode.label)
-        }
-
-        item {
-            AttributeDistributionCard(
-                title = "颜色分布",
-                options = stoolColors,
-                records = rangeRecords,
-                rangeLabel = rangeMode.label,
-                selector = { it.stoolColor }
-            )
-        }
-
-        item {
-            AttributeDistributionCard(
-                title = "分量分布",
-                options = stoolAmounts,
-                records = rangeRecords,
-                rangeLabel = rangeMode.label,
-                selector = { it.stoolAmount }
-            )
-        }
-
-        item {
-            AttributeDistributionCard(
-                title = "气味分布",
-                options = stoolSmells,
-                records = rangeRecords,
-                rangeLabel = rangeMode.label,
-                selector = { it.stoolSmell }
-            )
-        }
-
-        item {
-            CalendarCard(
-                grouped = grouped,
-                rangeStart = rangeStart,
-                rangeEnd = rangeEnd,
-                onSelectDate = { date ->
-                    // 点某天 = 把统计范围切到那一天，顺手回答「这天到底怎么样」
-                    customStart = date
-                    customEnd = date
-                    rangeMode = StatsRange.Custom
+            CollapsibleSection(
+                title = "概览与趋势",
+                subtitle = "$spanText",
+                expanded = overviewExpanded,
+                onToggle = {
+                    overviewExpanded = !overviewExpanded
+                    sectionPrefs.setExpanded(SectionPrefs.STATS_OVERVIEW, overviewExpanded)
                 }
-            )
+            ) {
+                OverviewCard(
+                    rangeLabel = rangeMode.label,
+                    spanText = spanText,
+                    total = total,
+                    perDay = perDay,
+                    averageDuration = averageDuration,
+                    healthRate = healthRate
+                )
+                TrendCard(grouped = grouped, endDate = rangeEnd)
+            }
+        }
+
+        // ── 分组二：分布分析（类型 / 属性 / 状态）──
+        item {
+            CollapsibleSection(
+                title = "分布分析",
+                subtitle = "类型 · 颜色 · 分量 · 气味 · 状态",
+                expanded = distributionExpanded,
+                onToggle = {
+                    distributionExpanded = !distributionExpanded
+                    sectionPrefs.setExpanded(SectionPrefs.STATS_DISTRIBUTION, distributionExpanded)
+                }
+            ) {
+                TypeDistributionCard(records = rangeRecords, rangeLabel = rangeMode.label)
+
+                AttributeDistributionCard(
+                    title = "颜色分布",
+                    options = stoolColors,
+                    records = rangeRecords,
+                    rangeLabel = rangeMode.label,
+                    selector = { it.stoolColor }
+                )
+
+                AttributeDistributionCard(
+                    title = "分量分布",
+                    options = stoolAmounts,
+                    records = rangeRecords,
+                    rangeLabel = rangeMode.label,
+                    selector = { it.stoolAmount }
+                )
+
+                AttributeDistributionCard(
+                    title = "气味分布",
+                    options = stoolSmells,
+                    records = rangeRecords,
+                    rangeLabel = rangeMode.label,
+                    selector = { it.stoolSmell }
+                )
+
+                // v2.4.2 补齐：此卡片代码早已存在，但此前从未被渲染，
+                // 导致「当前状态」的分布统计在页面上看不到。
+                StatusDistributionCard(records = rangeRecords, rangeLabel = rangeMode.label)
+            }
+        }
+
+        // ── 分组三：日历 ──
+        item {
+            CollapsibleSection(
+                title = "日历",
+                subtitle = "按月查看记录分布，点某天可只看那天",
+                expanded = calendarExpanded,
+                onToggle = {
+                    calendarExpanded = !calendarExpanded
+                    sectionPrefs.setExpanded(SectionPrefs.STATS_CALENDAR, calendarExpanded)
+                }
+            ) {
+                CalendarCard(
+                    grouped = grouped,
+                    rangeStart = rangeStart,
+                    rangeEnd = rangeEnd,
+                    onSelectDate = { date ->
+                        // 点某天 = 把统计范围切到那一天，顺手回答「这天到底怎么样」
+                        customStart = date
+                        customEnd = date
+                        rangeMode = StatsRange.Custom
+                    }
+                )
+            }
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(LxSpacing.xl))
         }
     }
 }
@@ -314,65 +361,60 @@ private fun OverviewCard(
     averageDuration: Int,
     healthRate: Int
 ) {
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片，这里不再套 Card
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "总览",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = rangeLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
             Text(
-                text = spanText,
+                text = "总览",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = rangeLabel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Text(
+            text = spanText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+        ) {
+            StatMetric(modifier = Modifier.weight(1f), label = "次数", value = total.toString())
+            StatMetric(
+                modifier = Modifier.weight(1f),
+                label = "日均次数",
+                value = "%.1f".format(perDay)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+        ) {
+            StatMetric(
+                modifier = Modifier.weight(1f),
+                label = "平均时长",
+                value = formatDuration(averageDuration)
+            )
+            StatMetric(modifier = Modifier.weight(1f), label = "健康率", value = "$healthRate%")
+        }
+        if (total == 0) {
+            Text(
+                text = "该范围内暂无记录，换个时间范围看看",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetric(modifier = Modifier.weight(1f), label = "次数", value = total.toString())
-                StatMetric(
-                    modifier = Modifier.weight(1f),
-                    label = "日均次数",
-                    value = "%.1f".format(perDay)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatMetric(
-                    modifier = Modifier.weight(1f),
-                    label = "平均时长",
-                    value = formatDuration(averageDuration)
-                )
-                StatMetric(modifier = Modifier.weight(1f), label = "健康率", value = "$healthRate%")
-            }
-            if (total == 0) {
-                Text(
-                    text = "该范围内暂无记录，换个时间范围看看",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -385,17 +427,18 @@ private fun StatMetric(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(LxShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(vertical = 16.dp),
+            .padding(vertical = LxSpacing.md),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary
         )
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
@@ -410,74 +453,70 @@ private fun TrendCard(grouped: Map<LocalDate, List<RecordEntity>>, endDate: Loca
     val days = (13 downTo 0).map { endDate.minusDays(it.toLong()) }
     val maxCount = days.maxOf { grouped[it]?.size ?: 0 }.coerceAtLeast(1)
 
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片，这里不再套 Card
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Text(
+                text = "14 天趋势",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = "${dayFormatter.format(days.first())} ~ ${dayFormatter.format(days.last())}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        days.chunked(7).forEach { weekDays ->
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text = "14 天趋势",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "${dayFormatter.format(days.first())} ~ ${dayFormatter.format(days.last())}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            days.chunked(7).forEach { weekDays ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    weekDays.forEach { day ->
-                        val count = grouped[day]?.size ?: 0
-                        Column(
+                weekDays.forEach { day ->
+                    val count = grouped[day]?.size ?: 0
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = count.toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .fillMaxHeight(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .fillMaxWidth()
+                                .padding(horizontal = 1.dp),
+                            contentAlignment = Alignment.BottomCenter
                         ) {
-                            Text(
-                                text = count.toString(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                             Box(
                                 modifier = Modifier
-                                    .weight(1f)
                                     .fillMaxWidth()
-                                    .padding(horizontal = 1.dp),
-                                contentAlignment = Alignment.BottomCenter
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .fillMaxHeight(count / maxCount.toFloat())
-                                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                        .background(MaterialTheme.colorScheme.primary)
-                                )
-                            }
-                            Text(
-                                text = "${day.monthValue}/${day.dayOfMonth}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                maxLines = 1,
-                                softWrap = false
+                                    .fillMaxHeight(count / maxCount.toFloat())
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
                             )
                         }
+                        Text(
+                            text = "${day.monthValue}/${day.dayOfMonth}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
             }
@@ -492,51 +531,47 @@ private fun TypeDistributionCard(
 ) {
     val total = records.size.coerceAtLeast(1)
 
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            DistributionTitle(title = "类型分布", rangeLabel = rangeLabel)
-            bristolTypes.forEach { type ->
-                val count = records.count { it.bristolType == type.type }
-                val ratio = count.toFloat() / total
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+        DistributionTitle(title = "类型分布", rangeLabel = rangeLabel)
+        bristolTypes.forEach { type ->
+            val count = records.count { it.bristolType == type.type }
+            val ratio = count.toFloat() / total
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = type.emoji, style = MaterialTheme.typography.bodyLarge)
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = "${type.type}型",
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Spacer(modifier = Modifier.size(10.dp))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(10.dp)
+                        .clip(RoundedCornerShape(5.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Text(text = type.emoji, style = MaterialTheme.typography.bodyLarge)
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(
-                        text = "${type.type}型",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                    Spacer(modifier = Modifier.size(10.dp))
                     Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(10.dp)
+                            .fillMaxWidth(ratio)
+                            .fillMaxHeight()
                             .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth(ratio)
-                                .fillMaxHeight()
-                                .clip(RoundedCornerShape(5.dp))
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                    }
-                    Spacer(modifier = Modifier.size(10.dp))
-                    Text(
-                        text = "$count",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                            .background(MaterialTheme.colorScheme.primary)
                     )
                 }
+                Spacer(modifier = Modifier.size(10.dp))
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -550,8 +585,8 @@ private fun DistributionTitle(title: String, rangeLabel: String) {
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
         Text(
@@ -572,28 +607,24 @@ private fun AttributeDistributionCard(
 ) {
     val total = records.size.coerceAtLeast(1)
 
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            DistributionTitle(title = title, rangeLabel = rangeLabel)
-            options.forEach { option ->
-                DistributionRow(
-                    label = option.label,
-                    count = records.count { selector(it) == option.id },
-                    total = total
-                )
-            }
+        DistributionTitle(title = title, rangeLabel = rangeLabel)
+        options.forEach { option ->
             DistributionRow(
-                label = "未记录",
-                count = records.count { selector(it).isNullOrBlank() },
+                label = option.label,
+                count = records.count { selector(it) == option.id },
                 total = total
             )
         }
+        DistributionRow(
+            label = "未记录",
+            count = records.count { selector(it).isNullOrBlank() },
+            total = total
+        )
     }
 }
 
@@ -609,33 +640,29 @@ private fun StatusDistributionCard(
         (record.bodyStatuses ?: "").split(',').filter { it.isNotBlank() }
     }
 
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            DistributionTitle(title = "状态分布", rangeLabel = rangeLabel)
-            bodyStatuses.forEach { option ->
-                DistributionRow(
-                    label = option.label,
-                    count = selectedIds.count { it == option.id },
-                    total = total
-                )
-            }
+        DistributionTitle(title = "状态分布", rangeLabel = rangeLabel)
+        bodyStatuses.forEach { option ->
             DistributionRow(
-                label = "未记录",
-                count = records.count { it.bodyStatuses.isNullOrBlank() },
+                label = option.label,
+                count = selectedIds.count { it == option.id },
                 total = total
             )
-            Text(
-                text = "一条记录可选多个状态，所以各项相加可能多于记录条数",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+        DistributionRow(
+            label = "未记录",
+            count = records.count { it.bodyStatuses.isNullOrBlank() },
+            total = total
+        )
+        Text(
+            text = "一条记录可选多个状态，所以各项相加可能多于记录条数",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -695,96 +722,91 @@ private fun CalendarCard(
     val leadingBlanks = firstDay.dayOfWeek.value % 7
     val weekDays = listOf("日", "一", "二", "三", "四", "五", "六")
 
-    Card(
+    // 区块化：外层已由 CollapsibleSection 提供卡片
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.sm)
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { month = month.minusMonths(1) }) {
-                    Text(text = "←", style = MaterialTheme.typography.titleLarge)
-                }
+            IconButton(onClick = { month = month.minusMonths(1) }) {
+                Text(text = "←", style = MaterialTheme.typography.titleMedium)
+            }
+            Text(
+                text = "${month.year}年${month.monthValue}月",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            IconButton(onClick = { month = month.plusMonths(1) }) {
+                Text(text = "→", style = MaterialTheme.typography.titleMedium)
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth()) {
+            weekDays.forEach { day ->
                 Text(
-                    text = "${month.year}年${month.monthValue}月",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    text = day,
                     modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
-                IconButton(onClick = { month = month.plusMonths(1) }) {
-                    Text(text = "→", style = MaterialTheme.typography.titleLarge)
-                }
             }
+        }
+        repeat((daysInMonth + leadingBlanks + 6) / 7) { weekIndex ->
             Row(modifier = Modifier.fillMaxWidth()) {
-                weekDays.forEach { day ->
-                    Text(
-                        text = day,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
-            repeat((daysInMonth + leadingBlanks + 6) / 7) { weekIndex ->
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    repeat(7) { dayIndex ->
-                        val cellIndex = weekIndex * 7 + dayIndex
-                        val dayNumber = cellIndex - leadingBlanks + 1
-                        val date = if (dayNumber in 1..daysInMonth) {
-                            month.atDay(dayNumber)
-                        } else {
-                            null
-                        }
-                        val count = date?.let { grouped[it]?.size } ?: 0
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(vertical = 3.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (date != null) {
-                                val inRange = !date.isBefore(rangeStart) && !date.isAfter(rangeEnd)
-                                Column(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(
-                                            if (inRange) {
-                                                MaterialTheme.colorScheme.primaryContainer
-                                            } else {
-                                                Color.Transparent
-                                            }
-                                        )
-                                        .clickable(enabled = !date.isAfter(today)) { onSelectDate(date) }
-                                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally
-                                ) {
-                                    Text(
-                                        text = dayNumber.toString(),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (count > 0) {
-                                        Box(
-                                            modifier = Modifier
-                                                .padding(top = 2.dp)
-                                                .size(16.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primary),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = count.toString(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
+                repeat(7) { dayIndex ->
+                    val cellIndex = weekIndex * 7 + dayIndex
+                    val dayNumber = cellIndex - leadingBlanks + 1
+                    val date = if (dayNumber in 1..daysInMonth) {
+                        month.atDay(dayNumber)
+                    } else {
+                        null
+                    }
+                    val count = date?.let { grouped[it]?.size } ?: 0
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(vertical = 3.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (date != null) {
+                            val inRange = !date.isBefore(rangeStart) && !date.isAfter(rangeEnd)
+                            Column(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(
+                                        if (inRange) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            Color.Transparent
                                         }
+                                    )
+                                    .clickable(enabled = !date.isAfter(today)) { onSelectDate(date) }
+                                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = dayNumber.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (count > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(top = 2.dp)
+                                            .size(16.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = count.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
                                     }
                                 }
                             }
@@ -792,11 +814,11 @@ private fun CalendarCard(
                     }
                 }
             }
-            Text(
-                text = "点某一天，统计范围会直接切到那天",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+        Text(
+            text = "点某一天，统计范围会直接切到那天",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

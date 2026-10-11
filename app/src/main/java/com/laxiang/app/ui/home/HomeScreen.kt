@@ -34,10 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.data.RecordEntity
+import com.laxiang.app.data.SectionPrefs
 import com.laxiang.app.model.bristolTypeOf
 import com.laxiang.app.model.formatDateTime
 import com.laxiang.app.model.formatDuration
@@ -45,6 +47,10 @@ import com.laxiang.app.model.formatElapsedSeconds
 import com.laxiang.app.model.stoolAttributeSummary
 import com.laxiang.app.model.statusLabels
 import com.laxiang.app.model.statusSummary
+import com.laxiang.app.ui.common.CollapsibleSection
+import com.laxiang.app.ui.common.LxDivider
+import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSpacing
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -112,6 +118,13 @@ fun HomeScreen(
     var filter by remember { mutableStateOf(RecordFilter.All) }
     var visibleCount by remember { mutableStateOf(PAGE_SIZE) }
 
+    // 今日概览折叠状态：默认展开，用户收起后记住
+    val context = LocalContext.current
+    val sectionPrefs = remember { SectionPrefs(context) }
+    var todayExpanded by remember {
+        mutableStateOf(sectionPrefs.isExpanded(SectionPrefs.HOME_TODAY, true))
+    }
+
     val filtered = remember(records, query, filter) {
         records.filter { it.matchesFilter(filter) && it.matchesQuery(query) }
     }
@@ -125,33 +138,37 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = LxSpacing.screenHorizontal),
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
         item {
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(LxSpacing.lg))
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(18.dp))
+                        .size(48.dp)
+                        .clip(LxShapes.inner)
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "💩", style = MaterialTheme.typography.headlineMedium)
+                    Text(
+                        text = "拉",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 }
-                Spacer(modifier = Modifier.size(12.dp))
+                Spacer(modifier = Modifier.size(LxSpacing.md))
                 Column {
                     Text(
                         text = "拉了么",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
                         text = "认真记录每一次身体信号",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -166,23 +183,102 @@ fun HomeScreen(
             )
         }
 
+        // 「今日概览」把原来的汇总卡与搜索筛选卡合成一张，可折叠
         item {
-            TodaySummaryCard(
-                todayCount = todayRecords.size,
-                averageDuration = averageDuration,
-                latestRecord = latestRecord
-            )
-        }
+            CollapsibleSection(
+                title = "今日概览",
+                subtitle = "今日 $todayRecords.size 次 · 平均 ${formatDuration(averageDuration)}" +
+                    " · 共 ${records.size} 条记录",
+                expanded = todayExpanded,
+                onToggle = {
+                    todayExpanded = !todayExpanded
+                    sectionPrefs.setExpanded(SectionPrefs.HOME_TODAY, todayExpanded)
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+                ) {
+                    SummaryMetric(
+                        modifier = Modifier.weight(1f),
+                        label = "今日次数",
+                        value = todayRecords.size.toString()
+                    )
+                    SummaryMetric(
+                        modifier = Modifier.weight(1f),
+                        label = "平均时长",
+                        value = formatDuration(averageDuration)
+                    )
+                    SummaryMetric(
+                        modifier = Modifier.weight(1f),
+                        label = "最近记录",
+                        value = latestRecord?.let { formatDateTime(it.occurredAt).takeLast(5) } ?: "--"
+                    )
+                }
 
-        item {
-            HistoryFilterCard(
-                query = query,
-                onQueryChange = { query = it },
-                filter = filter,
-                onFilterChange = { filter = it },
-                totalCount = records.size,
-                matchedCount = filtered.size
-            )
+                LxDivider()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "历史记录",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text(
+                        text = if (filtered.size == records.size) {
+                            "共 ${records.size} 条"
+                        } else {
+                            "命中 ${filtered.size} / ${records.size}"
+                        },
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("搜备注、类型、颜色分量或状态") },
+                    singleLine = true,
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            TextButton(onClick = { query = "" }) {
+                                Text("清空")
+                            }
+                        }
+                    }
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+                ) {
+                    RecordFilter.entries.take(3).forEach { item ->
+                        FilterChip(
+                            selected = filter == item,
+                            onClick = { filter = item },
+                            label = { Text(item.label) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+                ) {
+                    RecordFilter.entries.drop(3).forEach { item ->
+                        FilterChip(
+                            selected = filter == item,
+                            onClick = { filter = item },
+                            label = { Text(item.label) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
         }
 
         if (filtered.isEmpty()) {
@@ -218,7 +314,7 @@ fun HomeScreen(
         }
 
         item {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(LxSpacing.xl))
         }
     }
 }
@@ -348,87 +444,6 @@ private fun SummaryMetric(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-@Composable
-private fun HistoryFilterCard(
-    query: String,
-    onQueryChange: (String) -> Unit,
-    filter: RecordFilter,
-    onFilterChange: (RecordFilter) -> Unit,
-    totalCount: Int,
-    matchedCount: Int
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "历史记录",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = if (matchedCount == totalCount) {
-                        "共 $totalCount 条"
-                    } else {
-                        "命中 $matchedCount / $totalCount"
-                    },
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            OutlinedTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("搜备注、类型、颜色分量或状态") },
-                singleLine = true,
-                trailingIcon = {
-                    if (query.isNotEmpty()) {
-                        TextButton(onClick = { onQueryChange("") }) {
-                            Text("清空")
-                        }
-                    }
-                }
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RecordFilter.entries.take(3).forEach { item ->
-                    FilterChip(
-                        selected = filter == item,
-                        onClick = { onFilterChange(item) },
-                        label = { Text(item.label) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RecordFilter.entries.drop(3).forEach { item ->
-                    FilterChip(
-                        selected = filter == item,
-                        onClick = { onFilterChange(item) },
-                        label = { Text(item.label) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
     }
 }
 

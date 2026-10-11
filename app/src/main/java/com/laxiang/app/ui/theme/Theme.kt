@@ -46,6 +46,14 @@ fun LaxiangTheme(
 ) {
     MaterialTheme(
         colorScheme = if (darkTheme) DarkColors else LightColors,
+        typography = LxTypography,
+        shapes = androidx.compose.material3.Shapes(
+            extraSmall = LxShapes.chip,
+            small = LxShapes.chip,
+            medium = LxShapes.inner,
+            large = LxShapes.card,
+            extraLarge = LxShapes.card
+        ),
         content = content
     )
 }

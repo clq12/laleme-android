@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -27,6 +28,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.laxiang.app.ui.common.IconBook
+import com.laxiang.app.ui.common.IconHome
+import com.laxiang.app.ui.common.IconSettings
+import com.laxiang.app.ui.common.IconStats
 import com.laxiang.app.ui.editor.CameraScreen
 import com.laxiang.app.ui.editor.EditorScreen
 import com.laxiang.app.ui.home.HomeScreen
@@ -100,25 +105,57 @@ fun LaxiangApp() {
                 NavigationBarItem(
                     selected = currentRoute == "home",
                     onClick = { navController.navigate("home") { launchSingleTop = true } },
-                    icon = { Text("🏠") },
+                    icon = {
+                        IconHome(
+                            tint = if (currentRoute == "home") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
                     label = { Text("首页") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "stats",
                     onClick = { navController.navigate("stats") { launchSingleTop = true } },
-                    icon = { Text("📊") },
+                    icon = {
+                        IconStats(
+                            tint = if (currentRoute == "stats") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
                     label = { Text("统计") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "knowledge",
                     onClick = { navController.navigate("knowledge") { launchSingleTop = true } },
-                    icon = { Text("📖") },
+                    icon = {
+                        IconBook(
+                            tint = if (currentRoute == "knowledge") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
                     label = { Text("知识") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "settings",
                     onClick = { navController.navigate("settings") { launchSingleTop = true } },
-                    icon = { Text("⚙️") },
+                    icon = {
+                        IconSettings(
+                            tint = if (currentRoute == "settings") {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    },
                     label = { Text("设置") }
                 )
             }
