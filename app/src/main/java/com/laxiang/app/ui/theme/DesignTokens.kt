@@ -60,15 +60,28 @@ object LxSizes {
     val buttonLarge = 52.dp
     /** 普通按钮高度 */
     val button = 44.dp
+
+    // ── 图标尺寸梯度 ────────────────────────────────
+    // 规范要求：图标尺寸必须走令牌，不要到处散落 20/24/28 这类随意值，
+    // 否则同一个界面里图标的视觉重量会飘。这里定三档够用：
+    //   iconSm 20dp —— 行内/紧凑场景（列表项右侧、chip 内）
+    //   iconMd 24dp —— 标准控件（导航栏、图标按钮、标题左侧）
+    //   iconLg 32dp —— 空状态/功能锚点这类需要视觉重量的地方
+    /** 小图标 */
+    val iconSm = 20.dp
     /**
-     * 导航图标：与 M3 NavigationBarTokens.IconSize 一致（24dp）。
+     * 标准图标：与 M3 NavigationBarTokens.IconSize 一致（24dp）。
      *
      * 注意：M3 的 `NavigationBarItem` 会原样测量 icon 槽位并在整栏宽度内居中，
      * 而 label 走的是另一条（带 4dp 水平内缩的）排版路径。
      * 所以手绘图标必须保证「24dp 画布内的图形光学中心 = (12,12)」，
      * 否则会肉眼可见地相对文字偏左/偏上。校验见 _verify_icons.py。
      */
-    val iconNav = 24.dp
+    val iconMd = 24.dp
+    /** 大图标 */
+    val iconLg = 32.dp
+    /** 导航图标（语义别名，值同 iconMd） */
+    val iconNav = iconMd
     /** 卡片标题左侧的图标容器 */
     val iconBadge = 44.dp
     /** 布里斯托选择块 */

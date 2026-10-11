@@ -7,7 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -64,11 +63,21 @@ private fun navIconTint(selected: Boolean) =
 /**
  * 底部导航的一栏。
  *
- * 为什么把 icon 包一层 Box：M3 的 `NavigationBarItem` 会把 icon 槽位
- * 原样测量后在整栏宽度内居中，而它自带的选中指示器（pill）宽度是 64dp。
- * 我们的 Canvas 图标如果直接铺满 24dp，视觉上会显得比文字「大一号」，
- * 且因为没有指示器留白而看起来偏左。这里显式给出 24dp 的槽位盒、
- * 让指示器和图标共用同一中心，四个栏位的大小/位置就完全一致了。
+ * 关于图标尺寸与居中的两次迭代结论（别再退回旧写法）：
+ *
+ * 1. M3 的 `NavigationBarItem` 对 icon 槽位是「原样测量 + 在整栏宽度内居中」
+ *    （placeIcon: x = (containerWidth - iconWidth) / 2），而 label 走的是
+ *    另一条带 `NavigationBarItemHorizontalPadding/2`（=4dp）水平内缩的路径。
+ *    不过两者的 X 都基于**同一个** maxWidth，所以「图标相对文字偏移」
+ *    只可能来自图形本身的几何中心不在 24 栅格的 (12,12)。
+ *    → 已用 `_verify_icons.py` 逐个校验，四个图形中心都是 (12.00, 12.00)。
+ *
+ * 2. 尺寸必须走令牌、且**只在一处生效**。
+ *    之前写成 `Box(Modifier.size(iconNav)) { LxIconXxx(size = iconNav) }`
+ *    —— 外层 Box 与外层图标各自按 24dp 约束，等于把同一个尺寸声明了两遍；
+ *    由于 icon 槽位是原样测量，这会让实际占位与 M3 期望的 24dp 光学框不一致，
+ *    表现为「图标比文字大一号 / 位置不对」。
+ *    现在只由内层 Canvas 决定尺寸，外层只负责居中，不再重复声明。
  */
 @Composable
 private fun RowScope.LxNavItem(
@@ -81,10 +90,8 @@ private fun RowScope.LxNavItem(
         selected = selected,
         onClick = onClick,
         icon = {
-            Box(
-                modifier = Modifier.size(LxSizes.iconNav),
-                contentAlignment = Alignment.Center
-            ) { icon() }
+            // 只做居中对齐，尺寸交给图标自己（统一 24dp 令牌），避免二次约束
+            Box(contentAlignment = Alignment.Center) { icon() }
         },
         label = {
             Text(
