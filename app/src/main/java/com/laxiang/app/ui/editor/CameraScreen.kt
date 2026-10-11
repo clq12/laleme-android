@@ -50,6 +50,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.laxiang.app.ui.common.LxIconBack
 import com.laxiang.app.ui.common.LxIconCamera
+import com.laxiang.app.ui.common.LxInsets
 import com.laxiang.app.ui.theme.LxShapes
 import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.data.ImageCompressor
@@ -163,7 +164,14 @@ fun CameraScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.TopCenter)
-                    .padding(horizontal = 12.dp, vertical = 20.dp),
+                    // 取景界面是全屏沉浸的，返回按钮必须避开状态栏，
+                    // 否则会和状态栏的时间/信号图标叠在一起（无法点击）。
+                    .padding(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = LxInsets.statusBarHeight + 8.dp,
+                        bottom = 12.dp
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 相机是全屏页，返回按钮做成半透明圆形按钮，不遮挡取景画面

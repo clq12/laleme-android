@@ -406,6 +406,34 @@ fun LxIconClock(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
         line(tint, s, st, 12f, 12f, 15.6f, 13.8f)
     }
 
+/**
+ * 持续时间：沙漏。
+ *
+ * 为什么不复用 LxIconClock：记录卡里「发生时间」和「持续时间」是两行，
+ * 两行都用时钟图标会让用户分不清哪行是哪个；沙漏天然表达「一段时长」，
+ * 与「几点几分」的时钟形成明确区分。
+ */
+@Composable
+fun LxIconDuration(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
+    IconBase(tint, size, modifier) { s, st ->
+        // 上下两条横梁
+        line(tint, s, st, 6f, 3.6f, 18f, 3.6f)
+        line(tint, s, st, 6f, 20.4f, 18f, 20.4f)
+        // 沙漏轮廓：上下各一个梯形，中间收窄
+        path(tint, s, st) {
+            moveTo(6.4f, 3.6f)
+            lineTo(17.6f, 3.6f)
+            lineTo(12f, 12f)
+            close()
+        }
+        path(tint, s, st) {
+            moveTo(6.4f, 20.4f)
+            lineTo(17.6f, 20.4f)
+            lineTo(12f, 12f)
+            close()
+        }
+    }
+
 /** 备注：多行文本 */
 @Composable
 fun LxIconNotes(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =

@@ -196,7 +196,9 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
         item {
-            Spacer(modifier = Modifier.height(LxSpacing.xl))
+            // 顶部让开状态栏：Scaffold 已把 safeDrawing 顶边给了 body，
+            // 这里只补一段呼吸留白，避免与 Scaffold 的 inset 双重叠加。
+            Spacer(modifier = Modifier.height(LxSpacing.sm))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier

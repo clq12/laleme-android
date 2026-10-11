@@ -72,6 +72,7 @@ import com.laxiang.app.ui.common.LxIconDelete
 import com.laxiang.app.ui.common.LxIconGallery
 import com.laxiang.app.ui.common.LxIconWarning
 import com.laxiang.app.ui.common.LxOptionFlow
+import com.laxiang.app.ui.common.LxInsets
 import com.laxiang.app.ui.theme.LxShapes
 import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.ui.theme.LxSpacing
@@ -121,8 +122,14 @@ fun EditorScreen(
             .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = LxSpacing.screenHorizontal)
+            // 编辑页没有 NavigationBar 兜底（它是 push 出来的全屏页），
+            // 底部必须自己避开手势条/虚拟导航键，否则「删除这条记录」会被压住。
+            .padding(bottom = LxInsets.navigationBarHeight)
     ) {
-        Spacer(modifier = Modifier.height(LxSpacing.lg))
+        // 顶部让开状态栏：本页没有 Scaffold 包一层，所以要自己补
+        // 「状态栏高度 + 一段呼吸留白」。返回按钮是 48dp 触控区，
+        // 不给足顶部间距时会被状态栏的时间/信号图标压住。
+        Spacer(modifier = Modifier.height(LxInsets.pageTopPadding))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically

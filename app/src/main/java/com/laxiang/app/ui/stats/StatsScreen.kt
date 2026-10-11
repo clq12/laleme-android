@@ -176,7 +176,9 @@ fun StatsScreen(records: List<RecordEntity>) {
         verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
         item {
-            Spacer(modifier = Modifier.height(LxSpacing.xl))
+            // 顶部让开状态栏：Scaffold 已经把 safeDrawing 顶边作为 body 上内边距，
+            // 这里只留一段视觉呼吸间距（原先用 xl=24dp 硬凑状态栏高度，会双重留白）。
+            Spacer(modifier = Modifier.height(LxSpacing.sm))
             Text(
                 text = "数据大盘",
                 style = MaterialTheme.typography.headlineSmall,

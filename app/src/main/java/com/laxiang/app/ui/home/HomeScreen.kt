@@ -67,6 +67,8 @@ import com.laxiang.app.ui.common.LxDivider
 import com.laxiang.app.ui.common.LxIconAdd
 import com.laxiang.app.ui.common.LxIconChevronRight
 import com.laxiang.app.ui.common.LxIconClock
+import com.laxiang.app.ui.common.LxIconDelete
+import com.laxiang.app.ui.common.LxIconDuration
 import com.laxiang.app.ui.common.LxIconLeaf
 import com.laxiang.app.ui.common.LxIconSearch
 import com.laxiang.app.ui.common.LxIconTimer
@@ -295,7 +297,9 @@ private fun buildTodaySubtitle(
 @Composable
 private fun HomeHeader(todayCount: Int) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(LxSpacing.lg))
+        // 顶部让开状态栏：Scaffold 已把 safeDrawing 顶边给了 body，
+        // 这里只补一段视觉呼吸留白（不再是「拿 24dp 硬凑状态栏高度」）。
+        Spacer(modifier = Modifier.height(LxSpacing.md))
         Row(verticalAlignment = Alignment.CenterVertically) {
             AppLogoBadge(size = LxSizes.iconBadge)
             Spacer(modifier = Modifier.size(LxSpacing.md))
@@ -718,6 +722,17 @@ private fun RecordCard(
                     .fillMaxHeight()
                     .background(accentColor)
             )
+            // ── 排版重构（v2.5.3）──────────────────────────────
+            // 用户反馈的三个排版问题，根因是「所有内容都塞在一个 weight(1f)
+            // 的 Column 里、且与删除按钮同处一个 Row」：
+            //   1. 形态标题 + 「需留意」胶囊并排 → 标题长一点，胶囊就被挤出
+            //      可用宽度，「需留意」被压成「需留 / 意」两行；
+            //   2. 时间与时长用 " · " 拼成一行 → 窄屏必折行，且折点不可控，
+            //      出现「2026-10-10 19:20 · 4 / 分38秒」这种把数字切开的断法；
+            //   3. 删除按钮在最右侧吃掉宽度，进一步压缩上面两处的可用空间。
+            // 解法：把内容列拆成「标题行 / 时间行 / 时长行」三条独立行，
+            // 时间与时长都改为单行不折（nowrap），删除按钮移到卡片右上角
+            // 作为图标按钮，不再和文字抢宽度。
             Row(
                 modifier = Modifier
                     .weight(1f)
@@ -735,47 +750,61 @@ private fun RecordCard(
                     LxBristolShape(
                         type = record.bristolType,
                         tint = if (ideal) semantic.onIdealContainer else semantic.onCautionContainer,
-                        size = 26.dp
+                        size = LxSizes.iconShape
                     )
                 }
                 Spacer(modifier = Modifier.size(LxSpacing.md))
                 Column(modifier = Modifier.weight(1f)) {
+                    // 第 1 行：形态标题 + 状态胶囊。
+                    // 标题给 weight(1f) 并允许最多 2 行，胶囊用 wrapContentWidth
+                    // 保证「需留意」「理想型」永远是完整的三个字一行，
+                    // 不会再被压成两行（这是本次要修的核心问题）。
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = type.title,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                         Spacer(modifier = Modifier.size(LxSpacing.sm))
-                        Box(
-                            modifier = Modifier
-                                .clip(LxShapes.pill)
-                                .background(
-                                    if (ideal) semantic.idealContainer else semantic.cautionContainer
-                                )
-                                .padding(horizontal = LxSpacing.sm, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = accentLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (ideal) {
-                                    semantic.onIdealContainer
-                                } else {
-                                    semantic.onCautionContainer
-                                }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(LxSpacing.xs))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        LxIconClock(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 14.dp)
-                        Spacer(modifier = Modifier.size(LxSpacing.xs))
-                        Text(
-                            text = "${formatDateTime(record.occurredAt)} · ${formatDuration(record.durationSeconds)}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        StatusPill(
+                            label = accentLabel,
+                            container = if (ideal) {
+                                semantic.idealContainer
+                            } else {
+                                semantic.cautionContainer
+                            },
+                            content = if (ideal) {
+                                semantic.onIdealContainer
+                            } else {
+                                semantic.onCautionContainer
+                            }
                         )
                     }
+                    // 第 2 行：记录时间，独占一行，不折行。
+                    Spacer(modifier = Modifier.height(LxSpacing.xs))
+                    MetaLine(
+                        icon = {
+                            LxIconClock(
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                size = LxSizes.iconXs
+                            )
+                        },
+                        text = formatDateTime(record.occurredAt)
+                    )
+                    // 第 3 行：持续时间，另起一行（用户明确要求）。
+                    Spacer(modifier = Modifier.height(2.dp))
+                    MetaLine(
+                        icon = {
+                            LxIconDuration(
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                size = LxSizes.iconXs
+                            )
+                        },
+                        text = "持续时间 ${formatDuration(record.durationSeconds)}"
+                    )
                     val attributes = stoolAttributeSummary(
                         record.stoolColor,
                         record.stoolAmount,
@@ -798,7 +827,7 @@ private fun RecordCard(
                         Row(verticalAlignment = Alignment.Top) {
                             LxIconWarning(
                                 tint = semantic.caution,
-                                size = 14.dp,
+                                size = LxSizes.iconSm,
                                 modifier = Modifier.padding(top = 2.dp)
                             )
                             Spacer(modifier = Modifier.size(LxSpacing.xs))
@@ -828,20 +857,83 @@ private fun RecordCard(
                     }
                 }
             }
-            // 删除按钮：保持 48dp 触控高度，但视觉上退到次要位置
-            TextButton(
-                onClick = onDelete,
+            // 删除按钮：移到卡片右上角做图标按钮。
+            // 原来是带「删除」二字的 TextButton，横着占掉约 56dp 宽度，
+            // 正是把标题/时间挤出折行的那部分。换成 44dp 图标按钮后
+            // 内容列拿到完整宽度；触控区仍保持 48dp（外层 Box 撑满）。
+            Box(
                 modifier = Modifier
-                    .align(Alignment.CenterVertically)
-                    .heightIn(min = LxSizes.touchTarget)
-                    .padding(end = LxSpacing.sm)
+                    .align(Alignment.Top)
+                    .padding(top = LxSpacing.sm, end = LxSpacing.xs)
+                    .size(LxSizes.touchTarget)
+                    .clip(LxShapes.pill)
+                    .clickable(onClick = onDelete)
+                    .semantics { role = Role.Button },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "删除",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                LxIconDelete(
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    size = LxSizes.iconSm
                 )
             }
         }
+    }
+}
+
+/**
+ * 状态胶囊：「理想型」/「需留意」。
+ *
+ * 独立成组件的原因：这两个标签是本次反复出问题的位置 ——
+ * 必须保证「三个字永远在一行内完整显示」，
+ * 所以这里显式 `maxLines = 1` + `softWrap = false`，
+ * 并且不设 maxWidth 约束（让它按内容撑开），
+ * 由调用方用 `weight(1f, fill = false)` 把标题让出空间给它。
+ */
+@Composable
+private fun StatusPill(
+    label: String,
+    container: Color,
+    content: Color
+) {
+    Box(
+        modifier = Modifier
+            .clip(LxShapes.pill)
+            .background(container)
+            .padding(horizontal = LxSpacing.sm, vertical = 2.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = content,
+            maxLines = 1,
+            softWrap = false
+        )
+    }
+}
+
+/**
+ * 记录卡里「图标 + 一行元信息」的统一排版。
+ *
+ * 时间行与时长行共用：图标固定 12dp、垂直按首行基线对齐，
+ * 文字单行不折（`softWrap = false`），避免窄屏把
+ * 「2026-10-10 19:20」切成两行、或把「4分38秒」从数字中间断开。
+ */
+@Composable
+private fun MetaLine(
+    icon: @Composable () -> Unit,
+    text: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        icon()
+        Spacer(modifier = Modifier.size(LxSpacing.xs))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
     }
 }
