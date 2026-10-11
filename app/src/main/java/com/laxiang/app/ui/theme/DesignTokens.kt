@@ -27,6 +27,12 @@ object LxSpacing {
 
     /** 屏幕内容统一左右边距 */
     val screenHorizontal = lg
+
+    /** 卡片内部统一内边距 */
+    val cardPadding = lg
+
+    /** 列表底部留白，避免最后一项贴着导航栏 */
+    val listBottomInset = 28.dp
 }
 
 /**
@@ -41,6 +47,32 @@ object LxShapes {
     val chip = RoundedCornerShape(8.dp)
     /** 整条圆角（进度条、分隔块） */
     val pill = RoundedCornerShape(50)
+}
+
+/**
+ * 尺寸令牌：触控区域、图标、图形元素。
+ * 48dp 是 Material 规范的最小触控目标，关键可点元素都得达到。
+ */
+object LxSizes {
+    /** 最小触控高度（Material 规范） */
+    val touchTarget = 48.dp
+    /** 主操作按钮高度 */
+    val buttonLarge = 52.dp
+    /** 普通按钮高度 */
+    val button = 44.dp
+    /** 导航图标 */
+    val iconNav = 24.dp
+    /** 卡片标题左侧的图标容器 */
+    val iconBadge = 44.dp
+    /** 布里斯托选择块 */
+    val typeTileWidth = 76.dp
+    val typeTileHeight = 84.dp
+    /** 选项标签最小宽度 */
+    val optionMinWidth = 72.dp
+    /** 色板圆点 */
+    val swatch = 10.dp
+    /** 趋势柱条宽度 */
+    val trendBar = 10.dp
 }
 
 /**
@@ -61,7 +93,7 @@ val LxTypography = Typography().let { base ->
             lineHeight = 22.sp,
             fontWeight = FontWeight.Medium
         ),
-        // 分组标题（折叠区头部）
+        // 分组标题（折叠区头部）/ 小节标题
         titleSmall = base.titleSmall.copy(
             fontSize = 14.sp,
             lineHeight = 20.sp,

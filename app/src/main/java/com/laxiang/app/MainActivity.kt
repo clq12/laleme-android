@@ -28,10 +28,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.laxiang.app.ui.common.IconBook
-import com.laxiang.app.ui.common.IconHome
-import com.laxiang.app.ui.common.IconSettings
-import com.laxiang.app.ui.common.IconStats
+import com.laxiang.app.ui.common.LxIconBook
+import com.laxiang.app.ui.common.LxIconHome
+import com.laxiang.app.ui.common.LxIconSettings
+import com.laxiang.app.ui.common.LxIconStats
 import com.laxiang.app.ui.editor.CameraScreen
 import com.laxiang.app.ui.editor.EditorScreen
 import com.laxiang.app.ui.home.HomeScreen
@@ -39,6 +39,7 @@ import com.laxiang.app.ui.knowledge.KnowledgeScreen
 import com.laxiang.app.ui.settings.SettingsScreen
 import com.laxiang.app.ui.stats.StatsScreen
 import com.laxiang.app.ui.theme.LaxiangTheme
+import com.laxiang.app.ui.theme.LxSizes
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +52,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+@Composable
+private fun navIconTint(selected: Boolean) =
+    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
 
 @Composable
 fun LaxiangApp() {
@@ -99,63 +104,33 @@ fun LaxiangApp() {
     }
 
     Scaffold(
+        // 底部导航：inset 交给 NavigationBar 自己处理，避免被系统导航条盖住
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(
                     selected = currentRoute == "home",
                     onClick = { navController.navigate("home") { launchSingleTop = true } },
-                    icon = {
-                        IconHome(
-                            tint = if (currentRoute == "home") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
+                    icon = { LxIconHome(tint = navIconTint(currentRoute == "home"), size = LxSizes.iconNav) },
                     label = { Text("首页") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "stats",
                     onClick = { navController.navigate("stats") { launchSingleTop = true } },
-                    icon = {
-                        IconStats(
-                            tint = if (currentRoute == "stats") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
+                    icon = { LxIconStats(tint = navIconTint(currentRoute == "stats"), size = LxSizes.iconNav) },
                     label = { Text("统计") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "knowledge",
                     onClick = { navController.navigate("knowledge") { launchSingleTop = true } },
-                    icon = {
-                        IconBook(
-                            tint = if (currentRoute == "knowledge") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
+                    icon = { LxIconBook(tint = navIconTint(currentRoute == "knowledge"), size = LxSizes.iconNav) },
                     label = { Text("知识") }
                 )
                 NavigationBarItem(
                     selected = currentRoute == "settings",
                     onClick = { navController.navigate("settings") { launchSingleTop = true } },
-                    icon = {
-                        IconSettings(
-                            tint = if (currentRoute == "settings") {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    },
+                    icon = { LxIconSettings(tint = navIconTint(currentRoute == "settings"), size = LxSizes.iconNav) },
                     label = { Text("设置") }
                 )
             }

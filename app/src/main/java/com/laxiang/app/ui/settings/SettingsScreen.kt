@@ -3,8 +3,10 @@ package com.laxiang.app.ui.settings
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -30,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,7 +46,16 @@ import com.laxiang.app.data.SettingsEntity
 import com.laxiang.app.model.formatDateTime
 import com.laxiang.app.ui.common.CollapsibleSection
 import com.laxiang.app.ui.common.LxDivider
+import com.laxiang.app.ui.common.LxFieldLabel
+import com.laxiang.app.ui.common.LxIconDelete
+import com.laxiang.app.ui.common.LxIconDownload
+import com.laxiang.app.ui.common.LxIconStorage
+import com.laxiang.app.ui.common.LxIconSync
+import com.laxiang.app.ui.common.LxIconWarning
+import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.ui.theme.LxSpacing
+import com.laxiang.app.ui.theme.LxTheme
 
 private enum class PendingSyncAction(val title: String, val confirmLabel: String, val description: String) {
     Upload(
@@ -54,6 +69,17 @@ private enum class PendingSyncAction(val title: String, val confirmLabel: String
         description = "将以【云端】的 records.json 和照片覆盖本机，本机现有记录会被替换。" +
             "执行前会自动把本机数据备份到应用私有目录（保留最近 5 份）。"
     )
+}
+
+/**
+ * 同步方式的风险等级。
+ * 用「安全 / 需谨慎 / 不可撤销」三档把三种操作分开呈现，
+ * 避免用户把「合并同步」和「覆盖上传」当成同一件事随便点。
+ */
+private enum class RiskLevel(val label: String, val dotColor: @Composable () -> Color) {
+    Safe("安全", { LxTheme.semantic.ideal }),
+    Careful("需谨慎", { LxTheme.semantic.caution }),
+    Destructive("不可撤销", { LxTheme.semantic.alert })
 }
 
 @Composable
@@ -115,7 +141,13 @@ fun SettingsScreen(
     pendingAction?.let { action ->
         AlertDialog(
             onDismissRequest = { pendingAction = null },
-            title = { Text(action.title) },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LxIconWarning(tint = MaterialTheme.colorScheme.error, size = 20.dp)
+                    Spacer(modifier = Modifier.size(LxSpacing.sm))
+                    Text(action.title, color = MaterialTheme.colorScheme.error)
+                }
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(LxSpacing.md)) {
                     Text(action.description)
@@ -165,17 +197,30 @@ fun SettingsScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(LxSpacing.xl))
-            Text(
-                text = "设置",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onBackground
-            )
-            Spacer(modifier = Modifier.height(LxSpacing.xs))
-            Text(
-                text = "WebDAV 备份、数据维护与导出",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(LxShapes.inner)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LxIconStorage(tint = MaterialTheme.colorScheme.onPrimaryContainer, size = 24.dp)
+                }
+                Spacer(modifier = Modifier.size(LxSpacing.md))
+                Column {
+                    Text(
+                        text = "设置",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = "WebDAV 备份、数据维护与导出",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         // ── 分组一：数据同步（服务器配置 + 三种同步方式）──
@@ -204,11 +249,7 @@ fun SettingsScreen(
                     null
                 }
             ) {
-                Text(
-                    text = "WebDAV 服务器",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                LxFieldLabel(text = "WebDAV 服务器")
                 OutlinedTextField(
                     value = webdavUrl,
                     onValueChange = { webdavUrl = it },
@@ -236,8 +277,13 @@ fun SettingsScreen(
                         androidx.compose.ui.text.input.PasswordVisualTransformation()
                     },
                     trailingIcon = {
-                        TextButton(onClick = { showPassword = !showPassword }) {
-                            Text(if (showPassword) "隐藏" else "显示")
+                        // 明文/隐藏切换做成图标按钮，触控区仍保持 48dp
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Text(
+                                text = if (showPassword) "隐藏" else "显示",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
                     }
                 )
@@ -246,51 +292,39 @@ fun SettingsScreen(
                     onValueChange = { remotePath = it },
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("远端目录") },
-                    singleLine = true
+                    singleLine = true,
+                    supportingText = { Text("云端会把记录和照片放在这个目录下") }
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(LxSpacing.md)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)) {
                     Button(
                         onClick = { onSaveSettings(webdavUrl, username, password, remotePath) },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget),
                         enabled = !syncRunning
                     ) {
                         Text("保存配置")
                     }
                     OutlinedButton(
                         onClick = onTestConnection,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget),
                         enabled = !syncRunning
                     ) {
+                        LxIconSync(tint = MaterialTheme.colorScheme.onSurface, size = 18.dp)
+                        Spacer(modifier = Modifier.size(LxSpacing.sm))
                         Text("测试连接")
                     }
                 }
 
-                LxDivider()
-
-                Text(
-                    text = "同步方式",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Button(
-                    onClick = { onMergeSync(webdavUrl, username, password, remotePath) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    enabled = !syncRunning
-                ) {
-                    Text("合并同步（推荐）", style = MaterialTheme.typography.titleSmall)
-                }
-                Text(
-                    text = "按记录逐条比对更新时间，两边都保留、谁也不覆盖谁；照片双向补齐。" +
-                        "手机和电脑交替使用时用这个。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 if (syncProgress != null) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(LxShapes.inner)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(LxSpacing.md),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
                     ) {
@@ -298,32 +332,59 @@ fun SettingsScreen(
                         Text(
                             text = syncProgress,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(LxSpacing.md)) {
-                    OutlinedButton(
-                        onClick = { pendingAction = PendingSyncAction.Upload },
-                        modifier = Modifier.weight(1f),
-                        enabled = !syncRunning
-                    ) {
-                        Text("覆盖上传")
-                    }
-                    OutlinedButton(
-                        onClick = { pendingAction = PendingSyncAction.Download },
-                        modifier = Modifier.weight(1f),
-                        enabled = !syncRunning
-                    ) {
-                        Text("覆盖下载")
-                    }
+                LxDivider()
+
+                // ── 推荐路径：合并同步 ──
+                LxFieldLabel(text = "推荐 · 合并同步")
+                SyncModeCard(
+                    risk = RiskLevel.Safe,
+                    title = "合并同步",
+                    summary = "两边都保留，谁也不覆盖谁",
+                    detail = "按记录逐条比对更新时间，照片双向补齐。" +
+                        "手机和电脑交替使用时用这个，不会丢数据。",
+                    actionLabel = "合并同步",
+                    onAction = { onMergeSync(webdavUrl, username, password, remotePath) },
+                    enabled = !syncRunning
+                )
+
+                // ── 危险区：两种覆盖操作 ──
+                LxDivider()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    LxIconWarning(tint = LxTheme.semantic.alert, size = 18.dp)
+                    Spacer(modifier = Modifier.size(LxSpacing.sm))
+                    Text(
+                        text = "危险操作",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = LxTheme.semantic.alert
+                    )
                 }
                 Text(
-                    text = "覆盖上传/下载是单向整体替换、不做合并，点击后还需再确认一次。" +
-                        "覆盖下载执行前会先自动备份本机数据。",
+                    text = "下面两个操作是单向整体替换，不做合并。点击后还会再确认一次，覆盖下载会先自动备份本机数据。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                SyncModeCard(
+                    risk = RiskLevel.Destructive,
+                    title = "覆盖上传",
+                    summary = "用本机数据替换云端",
+                    detail = "云端原有的记录和照片会被删除，此操作不可撤销。",
+                    actionLabel = "覆盖上传",
+                    onAction = { pendingAction = PendingSyncAction.Upload },
+                    enabled = !syncRunning
+                )
+                SyncModeCard(
+                    risk = RiskLevel.Destructive,
+                    title = "覆盖下载",
+                    summary = "用云端数据替换本机",
+                    detail = "本机现有记录会被替换；执行前会自动备份本机数据，出问题还能回滚。",
+                    actionLabel = "覆盖下载",
+                    onAction = { pendingAction = PendingSyncAction.Download },
+                    enabled = !syncRunning
                 )
             }
         }
@@ -341,6 +402,7 @@ fun SettingsScreen(
                 }
             ) {
                 InfoRow("记录条数", "$localRecordCount 条")
+                LxDivider()
                 InfoRow(
                     label = "照片",
                     value = photoUsage?.let { "${it.fileCount} 张 · ${formatBytes(it.totalBytes)}" }
@@ -373,16 +435,26 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(LxSpacing.md)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)) {
                     OutlinedButton(
                         onClick = onCleanOrphanPhotos,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
+                        LxIconDelete(tint = MaterialTheme.colorScheme.error, size = 18.dp)
+                        Spacer(modifier = Modifier.size(LxSpacing.sm))
                         Text("清理无主照片")
                     }
                     OutlinedButton(
                         onClick = onRefreshMaintenance,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget)
                     ) {
                         Text("刷新")
                     }
@@ -413,8 +485,12 @@ fun SettingsScreen(
                 )
                 OutlinedButton(
                     onClick = { exportLauncher.launch(exportFileName()) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LxSizes.touchTarget)
                 ) {
+                    LxIconDownload(tint = MaterialTheme.colorScheme.onSurface, size = 18.dp)
+                    Spacer(modifier = Modifier.size(LxSpacing.sm))
                     Text("导出数据（zip）")
                 }
             }
@@ -422,6 +498,97 @@ fun SettingsScreen(
 
         item {
             Spacer(modifier = Modifier.height(LxSpacing.xl))
+        }
+    }
+}
+
+/**
+ * 同步方式卡片。
+ * 风险等级用「色点 + 文字」双重表达（不单靠颜色），
+ * 操作按钮放在卡片内部，和说明文字绑定，避免按钮与说明错位。
+ */
+@Composable
+private fun SyncModeCard(
+    risk: RiskLevel,
+    title: String,
+    summary: String,
+    detail: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    enabled: Boolean
+) {
+    val dotColor = risk.dotColor()
+    val destructive = risk == RiskLevel.Destructive
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(LxShapes.inner)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(LxSpacing.md),
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(LxShapes.pill)
+                    .background(dotColor)
+            )
+            Spacer(modifier = Modifier.size(LxSpacing.sm))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.size(LxSpacing.sm))
+            Box(
+                modifier = Modifier
+                    .clip(LxShapes.pill)
+                    .background(dotColor.copy(alpha = 0.16f))
+                    .padding(horizontal = LxSpacing.sm, vertical = 2.dp)
+            ) {
+                Text(
+                    text = risk.label,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = dotColor
+                )
+            }
+        }
+        Text(
+            text = summary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = detail,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (destructive) {
+            OutlinedButton(
+                onClick = onAction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LxSizes.touchTarget),
+                enabled = enabled,
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+            ) {
+                Text(actionLabel)
+            }
+        } else {
+            Button(
+                onClick = onAction,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(LxSizes.touchTarget),
+                enabled = enabled
+            ) {
+                Text(actionLabel)
+            }
         }
     }
 }

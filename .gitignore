@@ -16,3 +16,10 @@ app/src/main/assets/capacitor.config.json
 app/src/main/assets/capacitor.plugins.json
 app/src/main/res/xml/config.xml
 .DS_Store
+
+# ui-ux-pro-max 技能产出的临时设计系统文档，不属于工程产物
+design-system/
+
+# 本机推送脚本（含 Git Data API 逻辑），不入库
+_push.py
+_checkci.py

@@ -1,24 +1,28 @@
 package com.laxiang.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -34,7 +38,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,9 +56,20 @@ import com.laxiang.app.model.stoolAttributeSummary
 import com.laxiang.app.model.statusLabels
 import com.laxiang.app.model.statusSummary
 import com.laxiang.app.ui.common.CollapsibleSection
+import com.laxiang.app.ui.common.LxBristolShape
 import com.laxiang.app.ui.common.LxDivider
+import com.laxiang.app.ui.common.LxIconAdd
+import com.laxiang.app.ui.common.LxIconChevronRight
+import com.laxiang.app.ui.common.LxIconClock
+import com.laxiang.app.ui.common.LxIconLeaf
+import com.laxiang.app.ui.common.LxIconSearch
+import com.laxiang.app.ui.common.LxIconTimer
+import com.laxiang.app.ui.common.LxIconWarning
+import com.laxiang.app.ui.common.LxOptionChip
 import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.ui.theme.LxSpacing
+import com.laxiang.app.ui.theme.LxTheme
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -92,6 +111,9 @@ private fun RecordEntity.matchesQuery(query: String): Boolean {
     return haystack.contains(keyword, ignoreCase = true)
 }
 
+/** 布里斯托 3/4 型为「理想型」，其余为「需留意」，用于记录卡左侧的状态标记 */
+private fun isIdealType(type: Int) = type == 3 || type == 4
+
 @Composable
 fun HomeScreen(
     records: List<RecordEntity>,
@@ -112,7 +134,9 @@ fun HomeScreen(
     } else {
         todayRecords.sumOf { it.durationSeconds } / todayRecords.size
     }
-    val latestRecord = todayRecords.maxByOrNull { it.occurredAt }
+    val latestRecord = records.maxByOrNull { it.occurredAt }
+    val latestTodayRecord = todayRecords.maxByOrNull { it.occurredAt }
+    val idealCountToday = todayRecords.count { isIdealType(it.bristolType) }
 
     var query by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(RecordFilter.All) }
@@ -141,38 +165,17 @@ fun HomeScreen(
             .padding(horizontal = LxSpacing.screenHorizontal),
         verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
+        item { HomeHeader(todayCount = todayRecords.size) }
+
+        // 主入口：新增记录。放在最显眼位置，是第一屏唯一的实心主按钮。
         item {
-            Spacer(modifier = Modifier.height(LxSpacing.lg))
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(LxShapes.inner)
-                        .background(MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "拉",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
+            PrimaryAddRecordCard(
+                onClick = {
+                    // 走「计时→结束并记录」这条既有链路，保证与旧行为一致：
+                    // 空计时器点开就是一条新记录，且不覆盖已有草稿。
+                    onStopTimer()
                 }
-                Spacer(modifier = Modifier.size(LxSpacing.md))
-                Column {
-                    Text(
-                        text = "拉了么",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "认真记录每一次身体信号",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
+            )
         }
 
         item {
@@ -183,12 +186,15 @@ fun HomeScreen(
             )
         }
 
-        // 「今日概览」把原来的汇总卡与搜索筛选卡合成一张，可折叠
+        // 今日概览：第一屏只看「今天」的关键数字，其余统计都在统计页
         item {
             CollapsibleSection(
                 title = "今日概览",
-                subtitle = "今日 $todayRecords.size 次 · 平均 ${formatDuration(averageDuration)}" +
-                    " · 共 ${records.size} 条记录",
+                subtitle = buildTodaySubtitle(
+                    todayCount = todayRecords.size,
+                    averageDuration = averageDuration,
+                    idealCount = idealCountToday
+                ),
                 expanded = todayExpanded,
                 onToggle = {
                     todayExpanded = !todayExpanded
@@ -211,79 +217,30 @@ fun HomeScreen(
                     )
                     SummaryMetric(
                         modifier = Modifier.weight(1f),
-                        label = "最近记录",
-                        value = latestRecord?.let { formatDateTime(it.occurredAt).takeLast(5) } ?: "--"
+                        label = "最近一次",
+                        value = latestTodayRecord
+                            ?.let { formatDateTime(it.occurredAt).takeLast(5) }
+                            ?: "--"
                     )
-                }
-
-                LxDivider()
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "历史记录",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = if (filtered.size == records.size) {
-                            "共 ${records.size} 条"
-                        } else {
-                            "命中 ${filtered.size} / ${records.size}"
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("搜备注、类型、颜色分量或状态") },
-                    singleLine = true,
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            TextButton(onClick = { query = "" }) {
-                                Text("清空")
-                            }
-                        }
-                    }
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
-                ) {
-                    RecordFilter.entries.take(3).forEach { item ->
-                        FilterChip(
-                            selected = filter == item,
-                            onClick = { filter = item },
-                            label = { Text(item.label) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
-                ) {
-                    RecordFilter.entries.drop(3).forEach { item ->
-                        FilterChip(
-                            selected = filter == item,
-                            onClick = { filter = item },
-                            label = { Text(item.label) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
                 }
             }
         }
 
+        item { HistoryToolbar(
+            query = query,
+            onQueryChange = { query = it },
+            filter = filter,
+            onFilterChange = { filter = it },
+            filteredCount = filtered.size,
+            totalCount = records.size
+        ) }
+
         if (filtered.isEmpty()) {
             item {
-                EmptyStateCard(hasAnyRecord = records.isNotEmpty())
+                EmptyStateCard(
+                    hasAnyRecord = records.isNotEmpty(),
+                    onAddRecord = onStopTimer
+                )
             }
         } else {
             items(paged, key = { it.id }) { record ->
@@ -319,6 +276,115 @@ fun HomeScreen(
     }
 }
 
+private fun buildTodaySubtitle(
+    todayCount: Int,
+    averageDuration: Int,
+    idealCount: Int
+): String = when {
+    todayCount == 0 -> "今天还没有记录，点上面的按钮开始第一条"
+    else -> "今日 $todayCount 次 · 平均 ${formatDuration(averageDuration)}" +
+        " · 其中理想型 $idealCount 次"
+}
+
+@Composable
+private fun HomeHeader(todayCount: Int) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(LxSpacing.lg))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(LxSizes.iconBadge)
+                    .clip(LxShapes.inner)
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "拉",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(modifier = Modifier.size(LxSpacing.md))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "拉了么",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = "认真记录每一次身体信号",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // 今日次数做成紧凑徽标，取代原先压在概览卡里的大数字
+            if (todayCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .clip(LxShapes.pill)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = LxSpacing.md, vertical = LxSpacing.sm)
+                ) {
+                    Text(
+                        text = "今日 $todayCount 次",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 首页主操作：新增记录。
+ *
+ * 设计取舍：这是首页唯一使用 primary 实心填充的大块，
+ * 视觉权重明显高于其余卡片，用户第一眼就能识别出「要记录点这里」。
+ * 文案同时写清「点一下会发生什么」，避免只有一个图标造成理解成本。
+ */
+@Composable
+private fun PrimaryAddRecordCard(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 72.dp)
+            .clip(LxShapes.card)
+            .background(MaterialTheme.colorScheme.primary)
+            .clickable(onClick = onClick)
+            .semantics { role = Role.Button }
+            .padding(horizontal = LxSpacing.cardPadding, vertical = LxSpacing.md),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(LxSizes.iconBadge)
+                .clip(LxShapes.inner)
+                .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            LxIconAdd(tint = MaterialTheme.colorScheme.onPrimary, size = 24.dp)
+        }
+        Spacer(modifier = Modifier.size(LxSpacing.md))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "新增排便记录",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimary
+            )
+            Text(
+                text = "记录类型、颜色、分量与当时状态",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f)
+            )
+        }
+        LxIconChevronRight(
+            tint = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.82f),
+            size = 20.dp
+        )
+    }
+}
+
 @Composable
 private fun TimerCard(
     timerStart: Long?,
@@ -336,84 +402,67 @@ private fun TimerCard(
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "马桶计时器",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = if (timerStart == null) {
-                    "00:00"
-                } else {
-                    formatElapsedSeconds((now - timerStart) / 1000)
-                },
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(
-                onClick = if (timerStart == null) onStartTimer else onStopTimer,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text(
-                    text = if (timerStart == null) "开始计时" else "结束并记录",
-                    style = MaterialTheme.typography.titleMedium
-                )
-            }
-        }
-    }
-}
+    val running = timerStart != null
 
-@Composable
-private fun TodaySummaryCard(
-    todayCount: Int,
-    averageDuration: Int,
-    latestRecord: RecordEntity?
-) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(LxSpacing.cardPadding),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LxIconTimer(
+                    tint = if (running) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    size = 20.dp
+                )
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
+                Text(
+                    text = "马桶计时器",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(LxSpacing.md))
             Text(
-                text = "今日概览",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                text = if (running) {
+                    formatElapsedSeconds((now - timerStart) / 1000)
+                } else {
+                    "00:00"
+                },
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.Medium,
+                color = if (running) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SummaryMetric(
-                    modifier = Modifier.weight(1f),
-                    label = "今日次数",
-                    value = todayCount.toString()
-                )
-                SummaryMetric(
-                    modifier = Modifier.weight(1f),
-                    label = "平均时长",
-                    value = formatDuration(averageDuration)
-                )
-                SummaryMetric(
-                    modifier = Modifier.weight(1f),
-                    label = "最近记录",
-                    value = latestRecord?.let { formatDateTime(it.occurredAt).takeLast(5) } ?: "--"
-                )
+            Spacer(modifier = Modifier.height(LxSpacing.md))
+            // 计时中把主按钮让给「结束并记录」，未计时时用次级按钮，避免与新增记录抢焦点
+            if (running) {
+                androidx.compose.material3.Button(
+                    onClick = onStopTimer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LxSizes.buttonLarge)
+                ) {
+                    Text(text = "结束并记录", style = MaterialTheme.typography.titleMedium)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onStartTimer,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LxSizes.touchTarget)
+                ) {
+                    Text(text = "开始计时")
+                }
             }
         }
     }
@@ -427,23 +476,96 @@ private fun SummaryMetric(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
+            .clip(LxShapes.inner)
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(vertical = 16.dp, horizontal = 8.dp),
+            .padding(vertical = LxSpacing.md, horizontal = LxSpacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = value,
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(LxSpacing.xs))
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+}
+
+/**
+ * 历史记录工具条：标题 + 计数 + 搜索 + 筛选。
+ * 从原来塞在「今日概览」折叠区里独立出来 —— 搜索是高频动作，
+ * 折起来会让用户每次都得先展开一次。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HistoryToolbar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    filter: RecordFilter,
+    onFilterChange: (RecordFilter) -> Unit,
+    filteredCount: Int,
+    totalCount: Int
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "历史记录",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = if (filteredCount == totalCount) {
+                    "共 $totalCount 条"
+                } else {
+                    "命中 $filteredCount / $totalCount"
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(LxSpacing.sm))
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("搜备注、类型、颜色分量或状态") },
+            leadingIcon = {
+                LxIconSearch(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    TextButton(onClick = { onQueryChange("") }) {
+                        Text("清空")
+                    }
+                }
+            },
+            singleLine = true
+        )
+        Spacer(modifier = Modifier.height(LxSpacing.sm))
+        // 6 个筛选项改为自动换行，窄屏也不会被挤出屏幕外
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+        ) {
+            RecordFilter.entries.forEach { item ->
+                LxOptionChip(
+                    label = item.label,
+                    selected = filter == item,
+                    onClick = { onFilterChange(item) },
+                    onAccentContainer = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
     }
 }
 
@@ -456,11 +578,13 @@ private fun LoadMoreRow(
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        verticalArrangement = Arrangement.spacedBy(LxSpacing.xs)
     ) {
         OutlinedButton(
             onClick = onLoadMore,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(LxSizes.touchTarget)
         ) {
             Text("加载更多")
         }
@@ -473,7 +597,7 @@ private fun LoadMoreRow(
 }
 
 @Composable
-private fun EmptyStateCard(hasAnyRecord: Boolean) {
+private fun EmptyStateCard(hasAnyRecord: Boolean, onAddRecord: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -481,28 +605,51 @@ private fun EmptyStateCard(hasAnyRecord: Boolean) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 40.dp),
+                .padding(vertical = LxSpacing.xxl, horizontal = LxSpacing.cardPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(LxShapes.pill)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (hasAnyRecord) {
+                    LxIconSearch(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 26.dp)
+                } else {
+                    LxIconLeaf(tint = MaterialTheme.colorScheme.primary, size = 26.dp)
+                }
+            }
+            Spacer(modifier = Modifier.height(LxSpacing.md))
             Text(
-                text = if (hasAnyRecord) "🔍" else "🍃",
-                style = MaterialTheme.typography.displayMedium
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = if (hasAnyRecord) "没有匹配的记录" else "当前空空如也",
+                text = if (hasAnyRecord) "没有匹配的记录" else "还没有任何记录",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                color = MaterialTheme.colorScheme.onSurface
             )
+            Spacer(modifier = Modifier.height(LxSpacing.xs))
             Text(
                 text = if (hasAnyRecord) {
                     "换个关键词或筛选项试试"
                 } else {
-                    "点击上面的按钮开始第一条记录"
+                    "点下方按钮记录第一次，数据只存在你的手机上"
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            if (!hasAnyRecord) {
+                Spacer(modifier = Modifier.height(LxSpacing.lg))
+                androidx.compose.material3.Button(
+                    onClick = onAddRecord,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(LxSizes.buttonLarge)
+                ) {
+                    LxIconAdd(tint = MaterialTheme.colorScheme.onPrimary, size = 20.dp)
+                    Spacer(modifier = Modifier.size(LxSpacing.sm))
+                    Text(text = "新增第一条记录", style = MaterialTheme.typography.titleMedium)
+                }
+            }
         }
     }
 }
@@ -514,6 +661,15 @@ private fun RecordCard(
     onDelete: () -> Unit
 ) {
     val type = bristolTypeOf(record.bristolType)
+    val ideal = isIdealType(record.bristolType)
+    val semantic = LxTheme.semantic
+
+    // 理想型 / 需留意：用「有色标记条 + 文字标签」双重表达，不单靠颜色
+    val (accentColor: Color, accentLabel: String) = if (ideal) {
+        semantic.ideal to "理想型"
+    } else {
+        semantic.caution to "需留意"
+    }
 
     Card(
         modifier = Modifier
@@ -521,69 +677,137 @@ private fun RecordCard(
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = type.emoji,
-                style = MaterialTheme.typography.headlineMedium
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            // 左侧状态色条：颜色 + 屏读器可读的文字标签共同表达
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(accentColor)
             )
-            Spacer(modifier = Modifier.size(14.dp))
-            Column(
-                modifier = Modifier.weight(1f)
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(LxSpacing.cardPadding),
+                verticalAlignment = Alignment.Top
             ) {
-                Text(
-                    text = type.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${formatDateTime(record.occurredAt)} · ${formatDuration(record.durationSeconds)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = stoolAttributeSummary(
+                // 形态图示替代 emoji：不依赖系统字体，且能真实传达形态差异
+                Box(
+                    modifier = Modifier
+                        .size(LxSizes.iconBadge)
+                        .clip(LxShapes.inner)
+                        .background(if (ideal) semantic.idealContainer else semantic.cautionContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LxBristolShape(
+                        type = record.bristolType,
+                        tint = if (ideal) semantic.onIdealContainer else semantic.onCautionContainer,
+                        size = 26.dp
+                    )
+                }
+                Spacer(modifier = Modifier.size(LxSpacing.md))
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = type.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.size(LxSpacing.sm))
+                        Box(
+                            modifier = Modifier
+                                .clip(LxShapes.pill)
+                                .background(
+                                    if (ideal) semantic.idealContainer else semantic.cautionContainer
+                                )
+                                .padding(horizontal = LxSpacing.sm, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = accentLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (ideal) {
+                                    semantic.onIdealContainer
+                                } else {
+                                    semantic.onCautionContainer
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(LxSpacing.xs))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LxIconClock(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 14.dp)
+                        Spacer(modifier = Modifier.size(LxSpacing.xs))
+                        Text(
+                            text = "${formatDateTime(record.occurredAt)} · ${formatDuration(record.durationSeconds)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    val attributes = stoolAttributeSummary(
                         record.stoolColor,
                         record.stoolAmount,
                         record.stoolSmell,
                         record.bowelFeelings
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                val statuses = statusLabels(record.bodyStatuses)
-                if (statuses.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "当前状态：" + statuses.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.tertiary
                     )
-                }
-                if (record.notes.isNotBlank() || record.photoPath != null) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = buildString {
-                            append(record.notes)
-                            if (record.notes.isNotBlank() && record.photoPath != null) append(" · ")
-                            if (record.photoPath != null) append("有照片")
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    if (attributes.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(LxSpacing.xs))
+                        Text(
+                            text = attributes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    val statuses = statusLabels(record.bodyStatuses)
+                    if (statuses.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(LxSpacing.xs))
+                        Row(verticalAlignment = Alignment.Top) {
+                            LxIconWarning(
+                                tint = semantic.caution,
+                                size = 14.dp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.size(LxSpacing.xs))
+                            Text(
+                                text = statuses.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = semantic.caution,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    if (record.notes.isNotBlank() || record.photoPath != null) {
+                        Spacer(modifier = Modifier.height(LxSpacing.xs))
+                        Text(
+                            text = buildString {
+                                if (record.notes.isNotBlank()) append(record.notes)
+                                if (record.notes.isNotBlank() && record.photoPath != null) append(" · ")
+                                if (record.photoPath != null) append("附照片")
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.size(8.dp))
+            // 删除按钮：保持 48dp 触控高度，但视觉上退到次要位置
             TextButton(
                 onClick = onDelete,
-                modifier = Modifier.height(56.dp)
+                modifier = Modifier
+                    .align(Alignment.CenterVertically)
+                    .heightIn(min = LxSizes.touchTarget)
+                    .padding(end = LxSpacing.sm)
             ) {
-                Text(text = "删除")
+                Text(
+                    text = "删除",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

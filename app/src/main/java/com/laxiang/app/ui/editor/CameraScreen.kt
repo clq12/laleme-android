@@ -11,6 +11,7 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,12 +41,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.laxiang.app.ui.common.LxIconBack
+import com.laxiang.app.ui.common.LxIconCamera
+import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.data.ImageCompressor
 import java.io.File
 import java.util.UUID
@@ -160,8 +166,16 @@ fun CameraScreen(
                     .padding(horizontal = 12.dp, vertical = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onNavigateBack) {
-                    Text(text = "返回")
+                // 相机是全屏页，返回按钮做成半透明圆形按钮，不遮挡取景画面
+                Box(
+                    modifier = Modifier
+                        .size(LxSizes.touchTarget)
+                        .clip(LxShapes.pill)
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .clickable(onClick = onNavigateBack),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LxIconBack(tint = Color.White, size = 22.dp)
                 }
             }
 
@@ -207,7 +221,7 @@ fun CameraScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text(text = "📷", style = MaterialTheme.typography.headlineMedium)
+                    LxIconCamera(tint = MaterialTheme.colorScheme.onPrimary, size = 30.dp)
                 }
             }
         }

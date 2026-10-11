@@ -1,9 +1,13 @@
 package com.laxiang.app.ui.stats
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -38,13 +41,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.laxiang.app.data.RecordEntity
 import com.laxiang.app.data.SectionPrefs
 import com.laxiang.app.ui.common.CollapsibleSection
+import com.laxiang.app.ui.common.LxBristolShape
+import com.laxiang.app.ui.common.LxIconCalendar
+import com.laxiang.app.ui.common.LxIconChevronLeft
+import com.laxiang.app.ui.common.LxIconChevronRight
+import com.laxiang.app.ui.common.LxIconClock
+import com.laxiang.app.ui.common.LxIconIdeal
+import com.laxiang.app.ui.common.LxOptionChip
 import com.laxiang.app.ui.common.LaxiangDatePickerDialog
 import com.laxiang.app.ui.theme.LxShapes
+import com.laxiang.app.ui.theme.LxSizes
 import com.laxiang.app.ui.theme.LxSpacing
+import com.laxiang.app.ui.theme.LxTheme
 import com.laxiang.app.model.bristolTypes
 import com.laxiang.app.model.formatDuration
 import com.laxiang.app.model.StoolOption
@@ -171,7 +184,7 @@ fun StatsScreen(records: List<RecordEntity>) {
             )
             Spacer(modifier = Modifier.height(LxSpacing.xs))
             Text(
-                text = "下面的统计只算选定范围内的记录，默认最近 14 天",
+                text = "下面的统计都在同一范围内计算，默认最近 14 天",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -292,6 +305,7 @@ fun StatsScreen(records: List<RecordEntity>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RangeSelectorCard(
     rangeMode: StatsRange,
@@ -307,47 +321,88 @@ private fun RangeSelectorCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(LxSpacing.cardPadding),
+            verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
         ) {
-            Text(
-                text = "统计范围",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LxIconCalendar(tint = MaterialTheme.colorScheme.primary, size = 20.dp)
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
+                Text(
+                    text = "统计范围",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(LxShapes.pill)
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = LxSpacing.md, vertical = LxSpacing.xs)
+                ) {
+                    Text(
+                        text = rangeMode.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            // 三个范围选项自动换行，窄屏不会被截断
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm),
+                verticalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+            ) {
                 StatsRange.entries.forEach { mode ->
-                    FilterChip(
+                    LxOptionChip(
+                        label = mode.label,
                         selected = rangeMode == mode,
                         onClick = { onSelect(mode) },
-                        label = { Text(mode.label) }
+                        onAccentContainer = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
             if (rangeMode == StatsRange.Custom) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
                 ) {
                     OutlinedButton(
                         onClick = onPickStart,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget)
                     ) {
                         Text("开始 ${dayFormatter.format(customStart)}")
                     }
                     OutlinedButton(
                         onClick = onPickEnd,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(LxSizes.touchTarget)
                     ) {
                         Text("结束 ${dayFormatter.format(customEnd)}")
                     }
                 }
             }
-            Text(
-                text = spanText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(LxShapes.inner)
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(LxSpacing.md),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LxIconClock(tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
+                Text(
+                    text = spanText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }
@@ -361,6 +416,34 @@ private fun OverviewCard(
     averageDuration: Int,
     healthRate: Int
 ) {
+    val semantic = LxTheme.semantic
+    // 健康率是这个 App 最该被看到的结论，单独提级到一个大数字块，
+    // 其余三个指标退成次级小格 —— 避免四个格子权重完全相同、看不出重点。
+    val rateTone = when {
+        total == 0 -> semantic.neutral
+        healthRate >= 70 -> semantic.ideal
+        healthRate >= 50 -> semantic.caution
+        else -> semantic.alert
+    }
+    val rateContainer = when {
+        total == 0 -> semantic.neutralContainer
+        healthRate >= 70 -> semantic.idealContainer
+        healthRate >= 50 -> semantic.cautionContainer
+        else -> semantic.alertContainer
+    }
+    val onRateContainer = when {
+        total == 0 -> semantic.onNeutralContainer
+        healthRate >= 70 -> semantic.onIdealContainer
+        healthRate >= 50 -> semantic.onCautionContainer
+        else -> semantic.onAlertContainer
+    }
+    val rateCaption = when {
+        total == 0 -> "该范围内暂无记录"
+        healthRate >= 70 -> "理想型占比良好"
+        healthRate >= 50 -> "理想型占比一般"
+        else -> "理想型占比偏低，可留意饮食与作息"
+    }
+
     // 区块化：外层已由 CollapsibleSection 提供卡片，这里不再套 Card
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -387,6 +470,39 @@ private fun OverviewCard(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        // 主指标：健康率
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(LxShapes.inner)
+                .background(rateContainer)
+                .padding(LxSpacing.cardPadding)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LxIconIdeal(tint = rateTone, size = 18.dp)
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
+                Text(
+                    text = "健康率（3/4 型占比）",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = onRateContainer
+                )
+            }
+            Spacer(modifier = Modifier.height(LxSpacing.sm))
+            Text(
+                text = if (total == 0) "--" else "$healthRate%",
+                style = MaterialTheme.typography.displaySmall,
+                color = rateTone
+            )
+            Spacer(modifier = Modifier.height(LxSpacing.xs))
+            Text(
+                text = rateCaption,
+                style = MaterialTheme.typography.bodySmall,
+                color = onRateContainer
+            )
+        }
+
+        // 次级指标：三格等宽小卡
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
@@ -397,23 +513,10 @@ private fun OverviewCard(
                 label = "日均次数",
                 value = "%.1f".format(perDay)
             )
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
-        ) {
             StatMetric(
                 modifier = Modifier.weight(1f),
                 label = "平均时长",
                 value = formatDuration(averageDuration)
-            )
-            StatMetric(modifier = Modifier.weight(1f), label = "健康率", value = "$healthRate%")
-        }
-        if (total == 0) {
-            Text(
-                text = "该范围内暂无记录，换个时间范围看看",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -449,9 +552,11 @@ private fun StatMetric(
 
 @Composable
 private fun TrendCard(grouped: Map<LocalDate, List<RecordEntity>>, endDate: LocalDate) {
+    val semantic = LxTheme.semantic
     // 趋势图跟着选定范围走：始终画选定区间的最后 14 天
     val days = (13 downTo 0).map { endDate.minusDays(it.toLong()) }
     val maxCount = days.maxOf { grouped[it]?.size ?: 0 }.coerceAtLeast(1)
+    val totalInWindow = days.sumOf { grouped[it]?.size ?: 0 }
 
     // 区块化：外层已由 CollapsibleSection 提供卡片，这里不再套 Card
     Column(
@@ -463,23 +568,30 @@ private fun TrendCard(grouped: Map<LocalDate, List<RecordEntity>>, endDate: Loca
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "14 天趋势",
+                text = "最近 14 天走势",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "${dayFormatter.format(days.first())} ~ ${dayFormatter.format(days.last())}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = "峰值 $maxCount 次 / 天",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary
             )
         }
+        Text(
+            text = "${dayFormatter.format(days.first())} ~ ${dayFormatter.format(days.last())}" +
+                " · 合计 $totalInWindow 次",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
         days.chunked(7).forEach { weekDays ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .height(140.dp),
+                horizontalArrangement = Arrangement.spacedBy(LxSpacing.xs)
             ) {
                 weekDays.forEach { day ->
                     val count = grouped[day]?.size ?: 0
@@ -489,8 +601,9 @@ private fun TrendCard(grouped: Map<LocalDate, List<RecordEntity>>, endDate: Loca
                             .fillMaxHeight(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // 数值只在有记录时显示，避免 0 排成一行干扰视线
                         Text(
-                            text = count.toString(),
+                            text = if (count > 0) count.toString() else "",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -498,17 +611,26 @@ private fun TrendCard(grouped: Map<LocalDate, List<RecordEntity>>, endDate: Loca
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxWidth()
-                                .padding(horizontal = 1.dp),
+                                .padding(horizontal = 2.dp),
                             contentAlignment = Alignment.BottomCenter
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .fillMaxHeight(count / maxCount.toFloat())
-                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                    .background(MaterialTheme.colorScheme.primary)
+                                    .fillMaxHeight((count / maxCount.toFloat()).coerceIn(0f, 1f))
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                    .background(
+                                        // 越高越深，形成自然的「热度」梯度
+                                        when {
+                                            count == 0 -> Color.Transparent
+                                            count.toFloat() / maxCount >= 0.75f -> semantic.chartPrimary
+                                            count.toFloat() / maxCount >= 0.4f -> semantic.chartSecondary
+                                            else -> semantic.chartTertiary
+                                        }
+                                    )
                             )
                         }
+                        Spacer(modifier = Modifier.height(LxSpacing.xs))
                         Text(
                             text = "${day.monthValue}/${day.dayOfMonth}",
                             style = MaterialTheme.typography.labelSmall,
@@ -529,6 +651,7 @@ private fun TypeDistributionCard(
     records: List<RecordEntity>,
     rangeLabel: String
 ) {
+    val semantic = LxTheme.semantic
     val total = records.size.coerceAtLeast(1)
 
     // 区块化：外层已由 CollapsibleSection 提供卡片
@@ -540,37 +663,48 @@ private fun TypeDistributionCard(
         bristolTypes.forEach { type ->
             val count = records.count { it.bristolType == type.type }
             val ratio = count.toFloat() / total
+            val ideal = type.type == 3 || type.type == 4
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = type.emoji, style = MaterialTheme.typography.bodyLarge)
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = "${type.type}型",
-                    style = MaterialTheme.typography.labelLarge
+                // 与首页记录卡一致：矢量形态图示 + 理想/留意区分色
+                LxBristolShape(
+                    type = type.type,
+                    tint = if (ideal) semantic.ideal else semantic.caution,
+                    size = 20.dp
                 )
-                Spacer(modifier = Modifier.size(10.dp))
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
+                Text(
+                    text = "${type.type} 型",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.width(42.dp),
+                    maxLines = 1
+                )
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp))
+                        .height(LxSizes.trendBar)
+                        .clip(LxShapes.pill)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth(ratio)
+                            .fillMaxWidth(ratio.coerceIn(0f, 1f))
                             .fillMaxHeight()
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(MaterialTheme.colorScheme.primary)
+                            .clip(LxShapes.pill)
+                            .background(if (ideal) semantic.ideal else semantic.caution)
                     )
                 }
-                Spacer(modifier = Modifier.size(10.dp))
+                Spacer(modifier = Modifier.size(LxSpacing.sm))
                 Text(
                     text = "$count",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(24.dp),
+                    textAlign = TextAlign.End
                 )
             }
         }
@@ -672,7 +806,8 @@ private fun DistributionRow(
     count: Int,
     total: Int
 ) {
-    val ratio = count.toFloat() / total
+    val ratio = (count.toFloat() / total).coerceIn(0f, 1f)
+    // 0 次的分项不画条，只有底槽，避免一整片实心色看不出差异
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -680,30 +815,36 @@ private fun DistributionRow(
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.width(104.dp),
-            maxLines = 1
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.width(88.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
-        Spacer(modifier = Modifier.size(10.dp))
+        Spacer(modifier = Modifier.size(LxSpacing.sm))
         Box(
             modifier = Modifier
                 .weight(1f)
-                .height(10.dp)
-                .clip(RoundedCornerShape(5.dp))
+                .height(LxSizes.trendBar)
+                .clip(LxShapes.pill)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(ratio)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(5.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-            )
+            if (count > 0) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(ratio)
+                        .fillMaxHeight()
+                        .clip(LxShapes.pill)
+                        .background(LxTheme.semantic.chartPrimary)
+                )
+            }
         }
-        Spacer(modifier = Modifier.size(10.dp))
+        Spacer(modifier = Modifier.size(LxSpacing.sm))
         Text(
             text = "$count",
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(24.dp),
+            textAlign = TextAlign.End
         )
     }
 }
@@ -732,7 +873,7 @@ private fun CalendarCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { month = month.minusMonths(1) }) {
-                Text(text = "←", style = MaterialTheme.typography.titleMedium)
+                LxIconChevronLeft(tint = MaterialTheme.colorScheme.onSurface, size = 22.dp)
             }
             Text(
                 text = "${month.year}年${month.monthValue}月",
@@ -741,7 +882,7 @@ private fun CalendarCard(
                 textAlign = TextAlign.Center
             )
             IconButton(onClick = { month = month.plusMonths(1) }) {
-                Text(text = "→", style = MaterialTheme.typography.titleMedium)
+                LxIconChevronRight(tint = MaterialTheme.colorScheme.onSurface, size = 22.dp)
             }
         }
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -774,19 +915,31 @@ private fun CalendarCard(
                     ) {
                         if (date != null) {
                             val inRange = !date.isBefore(rangeStart) && !date.isAfter(rangeEnd)
+                            val isToday = date == today
                             Column(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .fillMaxWidth()
+                                    .heightIn(min = 40.dp)
+                                    .clip(LxShapes.chip)
                                     .background(
-                                        if (inRange) {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        } else {
-                                            Color.Transparent
+                                        when {
+                                            inRange -> MaterialTheme.colorScheme.primaryContainer
+                                            else -> Color.Transparent
                                         }
                                     )
+                                    .border(
+                                        width = if (isToday) 1.5.dp else 0.dp,
+                                        color = if (isToday) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                        shape = LxShapes.chip
+                                    )
                                     .clickable(enabled = !date.isAfter(today)) { onSelectDate(date) }
-                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                    .padding(horizontal = 4.dp, vertical = LxSpacing.xs),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
                                     text = dayNumber.toString(),
