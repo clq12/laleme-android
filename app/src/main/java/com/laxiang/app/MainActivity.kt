@@ -4,7 +4,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -18,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +60,41 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun navIconTint(selected: Boolean) =
     if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+
+/**
+ * 底部导航的一栏。
+ *
+ * 为什么把 icon 包一层 Box：M3 的 `NavigationBarItem` 会把 icon 槽位
+ * 原样测量后在整栏宽度内居中，而它自带的选中指示器（pill）宽度是 64dp。
+ * 我们的 Canvas 图标如果直接铺满 24dp，视觉上会显得比文字「大一号」，
+ * 且因为没有指示器留白而看起来偏左。这里显式给出 24dp 的槽位盒、
+ * 让指示器和图标共用同一中心，四个栏位的大小/位置就完全一致了。
+ */
+@Composable
+private fun RowScope.LxNavItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    icon: @Composable () -> Unit
+) {
+    NavigationBarItem(
+        selected = selected,
+        onClick = onClick,
+        icon = {
+            Box(
+                modifier = Modifier.size(LxSizes.iconNav),
+                contentAlignment = Alignment.Center
+            ) { icon() }
+        },
+        label = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                maxLines = 1
+            )
+        }
+    )
+}
 
 @Composable
 fun LaxiangApp() {
@@ -109,30 +148,29 @@ fun LaxiangApp() {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             NavigationBar {
-                NavigationBarItem(
+                LxNavItem(
                     selected = currentRoute == "home",
                     onClick = { navController.navigate("home") { launchSingleTop = true } },
-                    icon = { LxIconHome(tint = navIconTint(currentRoute == "home"), size = LxSizes.iconNav) },
-                    label = { Text("首页") }
-                )
-                NavigationBarItem(
+                    label = "首页"
+                ) { LxIconHome(tint = navIconTint(currentRoute == "home"), size = LxSizes.iconNav) }
+
+                LxNavItem(
                     selected = currentRoute == "stats",
                     onClick = { navController.navigate("stats") { launchSingleTop = true } },
-                    icon = { LxIconStats(tint = navIconTint(currentRoute == "stats"), size = LxSizes.iconNav) },
-                    label = { Text("统计") }
-                )
-                NavigationBarItem(
+                    label = "统计"
+                ) { LxIconStats(tint = navIconTint(currentRoute == "stats"), size = LxSizes.iconNav) }
+
+                LxNavItem(
                     selected = currentRoute == "knowledge",
                     onClick = { navController.navigate("knowledge") { launchSingleTop = true } },
-                    icon = { LxIconBook(tint = navIconTint(currentRoute == "knowledge"), size = LxSizes.iconNav) },
-                    label = { Text("知识") }
-                )
-                NavigationBarItem(
+                    label = "知识"
+                ) { LxIconBook(tint = navIconTint(currentRoute == "knowledge"), size = LxSizes.iconNav) }
+
+                LxNavItem(
                     selected = currentRoute == "settings",
                     onClick = { navController.navigate("settings") { launchSingleTop = true } },
-                    icon = { LxIconSettings(tint = navIconTint(currentRoute == "settings"), size = LxSizes.iconNav) },
-                    label = { Text("设置") }
-                )
+                    label = "设置"
+                ) { LxIconSettings(tint = navIconTint(currentRoute == "settings"), size = LxSizes.iconNav) }
             }
         }
     ) { innerPadding ->

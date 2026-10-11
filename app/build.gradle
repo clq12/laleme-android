@@ -19,8 +19,8 @@ android {
         applicationId 'com.laxiang.app'
         minSdk rootProject.ext.minSdkVersion
         targetSdk rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName '2.5.0'
+        versionCode 10
+        versionName '2.5.1'
     }
 
     signingConfigs {

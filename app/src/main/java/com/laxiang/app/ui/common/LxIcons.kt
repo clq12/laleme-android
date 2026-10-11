@@ -106,46 +106,50 @@ fun LxIconHome(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
 fun LxIconStats(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
     IconBase(tint, size, modifier) { s, st ->
         path(tint, s, st) {
-            moveTo(4f, 3.8f)
-            lineTo(4f, 20.2f)
-            lineTo(20.4f, 20.2f)
+            moveTo(3.8f, 3.8f)
+            lineTo(3.8f, 20.2f)
+            lineTo(20.2f, 20.2f)
         }
-        line(tint, s, st, 8.6f, 16.4f, 8.6f, 12.6f)
-        line(tint, s, st, 12.6f, 16.4f, 12.6f, 8.6f)
-        line(tint, s, st, 16.6f, 16.4f, 16.6f, 14.4f)
+        line(tint, s, st, 8.4f, 16.4f, 8.4f, 12.6f)
+        line(tint, s, st, 12f, 16.4f, 12f, 8.6f)
+        line(tint, s, st, 15.6f, 16.4f, 15.6f, 14.4f)
     }
 
 /** 知识：书本 */
 @Composable
 fun LxIconBook(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
     IconBase(tint, size, modifier) { s, st ->
+        // 整体上移 1：包围盒 5~21 -> 4~20，几何中心 13 -> 12。
         path(tint, s, st) {
-            moveTo(3.4f, 5f)
-            lineTo(9.2f, 5f)
-            lineTo(12f, 7.8f)
-            lineTo(14.8f, 5f)
-            lineTo(20.6f, 5f)
-            lineTo(20.6f, 18.2f)
-            lineTo(14.8f, 18.2f)
-            lineTo(12f, 21f)
-            lineTo(9.2f, 18.2f)
-            lineTo(3.4f, 18.2f)
+            moveTo(3.4f, 4f)
+            lineTo(9.2f, 4f)
+            lineTo(12f, 6.8f)
+            lineTo(14.8f, 4f)
+            lineTo(20.6f, 4f)
+            lineTo(20.6f, 17.2f)
+            lineTo(14.8f, 17.2f)
+            lineTo(12f, 20f)
+            lineTo(9.2f, 17.2f)
+            lineTo(3.4f, 17.2f)
             close()
         }
-        line(tint, s, st, 12f, 7.8f, 12f, 21f)
+        line(tint, s, st, 12f, 6.8f, 12f, 20f)
     }
 
 /** 设置：滑杆（比齿轮更符合「调参」语义，且小尺寸下更清晰） */
 @Composable
 fun LxIconSettings(tint: Color, modifier: Modifier = Modifier, size: Dp = 24.dp) =
     IconBase(tint, size, modifier) { s, st ->
-        line(tint, s, st, 4f, 7f, 20f, 7f)
-        line(tint, s, st, 4f, 12f, 20f, 12f)
-        line(tint, s, st, 4f, 17f, 20f, 17f)
-        // 三个滑块手柄
-        drawCircle(tint, radius = 2.4f * s, center = Offset(9f * s, 7f * s))
-        drawCircle(tint, radius = 2.4f * s, center = Offset(15f * s, 12f * s))
-        drawCircle(tint, radius = 2.4f * s, center = Offset(10.5f * s, 17f * s))
+        // 三条横线 + 三个滑块手柄：
+        // 线间距 4.2（而非 5）、整体向下平移 1.3，
+        // 使图形包围盒从 2.4~17.0 变为 4.4~19.6，几何中心回到 12。
+        line(tint, s, st, 3.6f, 5.6f, 20.4f, 5.6f)
+        line(tint, s, st, 3.6f, 12f, 20.4f, 12f)
+        line(tint, s, st, 3.6f, 18.4f, 20.4f, 18.4f)
+        // 三个滑块手柄（半径 2.3，线不会被手柄盖住两头）
+        drawCircle(tint, radius = 2.3f * s, center = Offset(9.4f * s, 5.6f * s))
+        drawCircle(tint, radius = 2.3f * s, center = Offset(15.2f * s, 12f * s))
+        drawCircle(tint, radius = 2.3f * s, center = Offset(10.6f * s, 18.4f * s))
     }
 
 // ══════════════════════════════════════════════

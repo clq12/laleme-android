@@ -60,7 +60,14 @@ object LxSizes {
     val buttonLarge = 52.dp
     /** 普通按钮高度 */
     val button = 44.dp
-    /** 导航图标 */
+    /**
+     * 导航图标：与 M3 NavigationBarTokens.IconSize 一致（24dp）。
+     *
+     * 注意：M3 的 `NavigationBarItem` 会原样测量 icon 槽位并在整栏宽度内居中，
+     * 而 label 走的是另一条（带 4dp 水平内缩的）排版路径。
+     * 所以手绘图标必须保证「24dp 画布内的图形光学中心 = (12,12)」，
+     * 否则会肉眼可见地相对文字偏左/偏上。校验见 _verify_icons.py。
+     */
     val iconNav = 24.dp
     /** 卡片标题左侧的图标容器 */
     val iconBadge = 44.dp

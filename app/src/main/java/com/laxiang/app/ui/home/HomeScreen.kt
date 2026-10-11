@@ -1,5 +1,6 @@
 package com.laxiang.app.ui.home
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,15 +38,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.laxiang.app.R
 import com.laxiang.app.data.RecordEntity
 import com.laxiang.app.data.SectionPrefs
 import com.laxiang.app.model.bristolTypeOf
@@ -291,19 +297,7 @@ private fun HomeHeader(todayCount: Int) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(LxSpacing.lg))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(LxSizes.iconBadge)
-                    .clip(LxShapes.inner)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "拉",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            }
+            AppLogoBadge(size = LxSizes.iconBadge)
             Spacer(modifier = Modifier.size(LxSpacing.md))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -333,6 +327,45 @@ private fun HomeHeader(todayCount: Int) {
                 }
             }
         }
+    }
+}
+
+/**
+ * 品牌标识：直接复用 App 的启动图标（自适应图标前景层）。
+ *
+ * 为什么不用文字占位：首页是用户每天看最多的页，
+ * 这里出现一个「拉」字会让人以为是没做完的占位符，
+ * 直接用真实图标能和桌面图标对上，建立品牌一致性。
+ */
+@Composable
+private fun AppLogoBadge(size: Dp) {
+    val ctx = LocalContext.current
+    // 优先取自适应图标的前景层（已含品牌背景圆角方块），
+    // 若某个密度下缺失则回退到合成图标，不会白屏。
+    // 注意：painterResource 是 @Composable，必须在组合作用域里调用，
+    // 不能塞进 remember 的 lambda（那里不是 Composable）。
+    val logoResId = remember(ctx) {
+        ctx.resources.getIdentifier("ic_launcher_foreground", "mipmap", ctx.packageName)
+            .takeIf { it != 0 } ?: R.mipmap.ic_launcher
+    }
+    val painter = painterResource(logoResId)
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(LxShapes.inner)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        // ic_launcher_foreground 在 108dp 画布中只占中间约 72dp，
+        // 直接 fillMaxSize 会有大量留白，故放大后 Crop 掉外围。
+        Image(
+            painter = painter,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .scale(1.42f)
+        )
     }
 }
 

@@ -455,7 +455,7 @@ class LaxiangRepository(
         recordId: String
     ): String = client.joinUrl(
         baseUrl,
-        "$basePath/photos/${Uri.encode("$recordId.jpg", "")}"
+        "$basePath/photos/${Uri.encode("${recordId}.jpg", "")}"
     )
 
     /** 云端 photos 目录里，凡是不对应任何有效记录的都删掉，免得只增不减。 */
