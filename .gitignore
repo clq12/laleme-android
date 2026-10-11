@@ -20,6 +20,9 @@ app/src/main/res/xml/config.xml
 # ui-ux-pro-max 技能产出的临时设计系统文档，不属于工程产物
 design-system/
 
-# 本机推送脚本（含 Git Data API 逻辑），不入库
+# 本机推送/校验脚本（Git Data API、图标几何校验等），一律不入库
+# 统一用 `_` 前缀命名，靠下面这条兜住，避免再漏进仓库
+_*.py
+_*.txt
 _push.py
 _checkci.py
