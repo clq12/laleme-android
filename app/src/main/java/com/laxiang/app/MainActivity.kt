@@ -4,6 +4,17 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -66,6 +79,83 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+//  一级导航（底部 Tab）的顺序表
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * 一级页面顺序 —— 左右滑动切换严格按这个顺序取相邻项。
+ *
+ * 为什么单独抽一张表而不是从 NavigationBar 的 children 反推：
+ * 侧滑的方向判定需要「当前在第几个 Tab」，NavigationBar 只负责渲染、不暴露顺序，
+ * 而且顺序本来就是导航的语义（首页 → 统计 → 知识 → 设置），
+ * 放在导航层比放在渲染层更合理。
+ *
+ * ⚠️ 增删一级页面时**必须同步改这里**，否则侧滑会跳过或停住。
+ */
+private val TopLevelRoutes = listOf("home", "stats", "knowledge", "settings")
+
+/** 触发翻页所需的最小水平位移。低于这个值视为「误触/抖动」，不翻页。 */
+private val SwipeDistanceThreshold = 56.dp
+
+/** 触发翻页所需的最小速度（dp/s）。用于「幅度小但很快」的轻扫。 */
+private val SwipeVelocityThreshold = 900.dp
+
+/** 一级页之间横向滑动动画时长 */
+private const val TAB_SLIDE_MS = 280
+
+/**
+ * 非一级页（编辑页 / 相机页）的淡入淡出时长。
+ * 取 700ms 是为了**与 M3 默认值完全一致**（反编译确认默认是 `fadeIn(tween(700))`），
+ * 这样加侧滑不会顺带改掉「进编辑页」的既有观感。
+ */
+private const val DEFAULT_FADE_MS = 700
+
+/**
+ * 判断这次切换是否为「一级 Tab 之间」的切换，并给出滑动方向。
+ *
+ * @return `1` = 进入更靠右的页面；`-1` = 进入更靠左的页面；
+ *         `null` = 不是 Tab 之间的切换（编辑页/相机页），走淡入淡出。
+ */
+private fun tabSlideDirection(from: String?, to: String?): Int? {
+    val fromIndex = TopLevelRoutes.indexOf(from)
+    val toIndex = TopLevelRoutes.indexOf(to)
+    if (fromIndex < 0 || toIndex < 0 || fromIndex == toIndex) return null
+    return if (toIndex > fromIndex) 1 else -1
+}
+
+/**
+ * 一级页面切换的横向滑动动画。
+ *
+ * 方向规则与 ViewPager / HorizontalPager 保持一致（用户对这两个的肌肉记忆最强）：
+ * 手指向左滑 → 内容左移 → 露出**右侧**的下一个页面。
+ */
+private val tabEnterTransition:
+    AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
+        when (val direction = tabSlideDirection(
+            initialState.destination.route,
+            targetState.destination.route
+        )) {
+            null -> fadeIn(animationSpec = tween(DEFAULT_FADE_MS))
+            else -> slideInHorizontally(animationSpec = tween(TAB_SLIDE_MS)) { width ->
+                if (direction > 0) width else -width
+            }
+        }
+    }
+
+private val tabExitTransition:
+    AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
+        when (val direction = tabSlideDirection(
+            initialState.destination.route,
+            targetState.destination.route
+        )) {
+            null -> fadeOut(animationSpec = tween(DEFAULT_FADE_MS))
+            else -> slideOutHorizontally(animationSpec = tween(TAB_SLIDE_MS)) { width ->
+                if (direction > 0) -width else width
+            }
+        }
+    }
 
 @Composable
 private fun navIconTint(selected: Boolean) =
@@ -237,6 +327,19 @@ fun LaxiangApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // ── 左右滑动切换一级页面 ──────────────────────────────
+    // 当前处于第几个 Tab；-1 表示当前不是一级页面（编辑页/相机页），此时禁用侧滑，
+    // 避免在编辑表单里横向划一下就被踢走。
+    val currentTabIndex = TopLevelRoutes.indexOf(currentRoute)
+    val swipeDistancePx = with(LocalDensity.current) { SwipeDistanceThreshold.toPx() }
+    val swipeVelocityPx = with(LocalDensity.current) { SwipeVelocityThreshold.toPx() }
+    // 累积本次拖动的水平位移，松手时据此决定翻不翻页。
+    // 用 remember 持有的 MutableFloatState 而不是局部 var：这个值要跨越
+    // 重组稳定存在（拖动过程中会写很多次），且只在手势回调里读写、
+    // 不被 composition 读取，所以不会引起无谓重组。
+    val swipeOffset = remember { mutableFloatStateOf(0f) }
+    val swipeState = rememberDraggableState { delta -> swipeOffset.floatValue += delta }
+
     LaunchedEffect(syncMessage) {
         val message = syncMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message)
@@ -305,10 +408,55 @@ fun LaxiangApp() {
             }
         }
     ) { innerPadding ->
+        // ── 左右滑动切换一级页面 ──────────────────────────────
+        // 为什么要先把 modifier 算出来：只有「当前在一级页面」时才挂手势。
+        // 编辑页/相机页是 push 出来的子页面，横向划一下就被踢回 Tab 会很难用。
+        //
+        // 为什么用 draggable(Orientation.Horizontal) 而不是 detectHorizontalDragGestures：
+        //   - draggable 在「水平方向超过 touch slop」之后才开始接管事件，
+        //     竖直滚动（各页都是 LazyColumn）仍照常走自己的手势，两者不打架；
+        //   - 它的 onDragStopped 会给出速度，能支持「幅度小但很快」的轻扫，
+        //     只靠位移阈值的话快速轻扫会没反应，手感很差。
+        //
+        // 不会吞掉子元素点击：卡片/按钮的 clickable 只有在位移未超 slop 时才算点击，
+        // 一旦横向划过 slop，点击会被正常取消并转成翻页 —— 这正是期望行为。
+        val swipeModifier = if (currentTabIndex >= 0) {
+            Modifier.draggable(
+                state = swipeState,
+                orientation = Orientation.Horizontal,
+                onDragStarted = { swipeOffset.floatValue = 0f },
+                onDragStopped = { velocity ->
+                    val dragged = swipeOffset.floatValue
+                    swipeOffset.floatValue = 0f
+                    // 拖动过程中正负抖动都会累积，这里看松手时的「净位移 + 速度」
+                    val wantsNext = dragged <= -swipeDistancePx || velocity <= -swipeVelocityPx
+                    val wantsPrevious = dragged >= swipeDistancePx || velocity >= swipeVelocityPx
+                    // 重新取一次索引，不依赖闭包里的旧快照
+                    val index = TopLevelRoutes.indexOf(currentRoute)
+                    when {
+                        wantsNext && index in 0 until TopLevelRoutes.lastIndex ->
+                            navController.navigate(TopLevelRoutes[index + 1]) { launchSingleTop = true }
+                        wantsPrevious && index > 0 ->
+                            navController.navigate(TopLevelRoutes[index - 1]) { launchSingleTop = true }
+                    }
+                }
+            )
+        } else {
+            Modifier
+        }
+
         NavHost(
             navController = navController,
             startDestination = "home",
-            modifier = Modifier.padding(innerPadding)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .then(swipeModifier),
+            // 一级页之间横向滑动，其余（编辑/相机）保持 M3 默认的 700ms 淡入淡出
+            enterTransition = tabEnterTransition,
+            exitTransition = tabExitTransition,
+            popEnterTransition = tabEnterTransition,
+            popExitTransition = tabExitTransition
         ) {
             composable("home") {
                 HomeScreen(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -214,7 +215,9 @@ fun StatsScreen(records: List<RecordEntity>) {
         item {
             CollapsibleSection(
                 title = "概览与趋势",
-                subtitle = "$spanText",
+                // 副标题改为「介绍这组里有什么」，与另外两组（分布分析 / 日历）风格一致。
+                // 原先这里直接放 spanText，和「统计范围」卡片里的范围摘要逐字重复。
+                subtitle = "健康率 · 次数 · 日均 · 时长 · 趋势",
                 expanded = overviewExpanded,
                 onToggle = {
                     overviewExpanded = !overviewExpanded
@@ -222,8 +225,6 @@ fun StatsScreen(records: List<RecordEntity>) {
                 }
             ) {
                 OverviewCard(
-                    rangeLabel = rangeMode.label,
-                    spanText = spanText,
                     total = total,
                     perDay = perDay,
                     averageDuration = averageDuration,
@@ -369,26 +370,53 @@ private fun RangeSelectorCard(
             if (rangeMode == StatsRange.Custom) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm)
+                    horizontalArrangement = Arrangement.spacedBy(LxSpacing.sm),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // 只显示日期本身，不带「开始 / 结束」字样。
+                    // 方向靠左右顺序 + 中间那个细箭头表达。
+                    //
+                    // contentPadding 收到 8dp（M3 默认是 24dp）：日期串本身就有
+                    // "2026-10-01" 这么长，沿用默认 24dp 内边距时
+                    // 「内容宽 + 48dp 边距」会超过按钮分到的宽度，文字被挤到换行/截断。
+                    // maxLines = 1 再加一道保险。
                     OutlinedButton(
                         onClick = onPickStart,
                         modifier = Modifier
                             .weight(1f)
-                            .height(LxSizes.touchTarget)
+                            .height(LxSizes.touchTarget),
+                        contentPadding = PaddingValues(horizontal = LxSpacing.sm)
                     ) {
-                        Text("开始 ${dayFormatter.format(customStart)}")
+                        Text(
+                            text = dayFormatter.format(customStart),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
+                    LxIconChevronRight(
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        size = 14.dp
+                    )
                     OutlinedButton(
                         onClick = onPickEnd,
                         modifier = Modifier
                             .weight(1f)
-                            .height(LxSizes.touchTarget)
+                            .height(LxSizes.touchTarget),
+                        contentPadding = PaddingValues(horizontal = LxSpacing.sm)
                     ) {
-                        Text("结束 ${dayFormatter.format(customEnd)}")
+                        Text(
+                            text = dayFormatter.format(customEnd),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
+            // ── 范围摘要：整页**唯一**的「起止 + 总天数」展示位 ──
+            // 原先这段 spanText 在同屏出现三次：本卡片、「概览与趋势」副标题、
+            // 「总览」卡片内。三处文案逐字相同，属于纯冗余。
+            // 现在统一收在这里 —— 这里是设置范围的控件所在处，改完立刻能看到结果，
+            // 也是唯一不随折叠状态变化而消失的位置。
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -411,8 +439,6 @@ private fun RangeSelectorCard(
 
 @Composable
 private fun OverviewCard(
-    rangeLabel: String,
-    spanText: String,
     total: Int,
     perDay: Double,
     averageDuration: Int,
@@ -451,25 +477,11 @@ private fun OverviewCard(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LxSpacing.md)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "总览",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            Text(
-                text = rangeLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
+        // 这里原先还有一行「范围模式标签 + 范围日期」，与上面的「统计范围」卡片
+        // 和本组副标题三处重复，已统一由「统计范围」卡片承担，不再重复显示。
         Text(
-            text = spanText,
-            style = MaterialTheme.typography.bodySmall,
+            text = "总览",
+            style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
